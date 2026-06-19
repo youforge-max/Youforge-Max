@@ -52,7 +52,7 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
     var spec by remember { mutableStateOf<OverlaySpec?>(null) }
     var description by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("build r2 · Pick a photo to start.") }
+    var status by remember { mutableStateOf("build r3 · Pick a photo to start.") }
     var showSettings by remember { mutableStateOf(false) }
     var modelReady by remember { mutableStateOf(modelMgr.isPresent()) }
     var stickers by remember { mutableStateOf<List<Sticker>>(emptyList()) }
@@ -155,9 +155,11 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
               Box(
                 Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 520.dp)
-                    .aspectRatio(16f / 9f)
+                    // Height-capped so the editor controls below always stay on
+                    // screen (some devices made the preview tall enough to push
+                    // everything off-screen). Width follows from the 16:9 height.
+                    .heightIn(max = 200.dp)
+                    .aspectRatio(16f / 9f, matchHeightConstraintsFirst = true)
                     .clip(RoundedCornerShape(10.dp))
                     .onSizeChanged { previewSize = it }
                     .pointerInput(Unit) {
@@ -382,6 +384,26 @@ private fun ModelDialog(
         mutableStateOf(if (modelMgr.isPresent()) "Model installed (offline ready)." else "No model yet.")
     }
 
+    // Pick a .task already on the device (e.g. in Downloads) — no re-download.
+    val filePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        progress = -1f
+        msg = "Importing local model…"
+        scope.launch {
+            val res = modelMgr.importFromFile(uri)
+            progress = null
+            if (res.isSuccess) {
+                msg = "Model installed from file (offline ready)."
+                onReadyChange(true)
+            } else {
+                msg = "Import failed: ${res.exceptionOrNull()?.message}"
+                onReadyChange(modelMgr.isPresent())
+            }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
@@ -409,10 +431,14 @@ private fun ModelDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("A small instruct model (.task) runs on this tablet. Default is Qwen2.5-1.5B (no login, ~1.6 GB) — or paste any MediaPipe .task URL. Downloads once, then works offline.",
                     style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(
+                    onClick = { filePicker.launch(arrayOf("*/*")) },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Pick local .task file (no download)") }
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("Model .task URL") },
+                    label = { Text("…or model .task URL") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )

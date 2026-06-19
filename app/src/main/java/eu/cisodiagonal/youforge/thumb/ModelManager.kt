@@ -77,4 +77,35 @@ class ModelManager(context: Context) {
                 Result.failure(e)
             }
         }
+
+    /**
+     * Imports a model the user already has on the device (e.g. in Downloads) via a
+     * SAF document URI — copied once into [modelFile], no network. Lets you keep one
+     * .task on shared storage and re-point to it after a reinstall instead of
+     * downloading again.
+     */
+    suspend fun importFromFile(uri: android.net.Uri): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            val tmp = File(appContext.filesDir, "gemma.task.part")
+            try {
+                tmp.delete()
+                appContext.contentResolver.openInputStream(uri)?.use { input ->
+                    tmp.outputStream().use { input.copyTo(it, 1 shl 16) }
+                } ?: return@withContext Result.failure(Exception("Cannot open that file"))
+                if (tmp.length() < 1_000_000L) {
+                    tmp.delete()
+                    return@withContext Result.failure(Exception("File too small to be a model"))
+                }
+                OnDeviceLlm.close()
+                modelFile.delete()
+                if (!tmp.renameTo(modelFile)) {
+                    tmp.delete()
+                    return@withContext Result.failure(Exception("Could not move model into place"))
+                }
+                Result.success(Unit)
+            } catch (e: Exception) {
+                tmp.delete()
+                Result.failure(e)
+            }
+        }
 }
