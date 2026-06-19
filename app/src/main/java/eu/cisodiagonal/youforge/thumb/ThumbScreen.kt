@@ -2,6 +2,7 @@ package eu.cisodiagonal.youforge.thumb
 
 import android.content.ContentValues
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Environment
@@ -51,7 +52,7 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
     var spec by remember { mutableStateOf<OverlaySpec?>(null) }
     var description by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("Pick a photo to start.") }
+    var status by remember { mutableStateOf("build r2 · Pick a photo to start.") }
     var showSettings by remember { mutableStateOf(false) }
     var modelReady by remember { mutableStateOf(modelMgr.isPresent()) }
     var stickers by remember { mutableStateOf<List<Sticker>>(emptyList()) }
@@ -82,8 +83,9 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
         if (uri == null) return@rememberLauncherForPicker
         scope.launch {
             status = "Loading photo…"
-            val bmp = withContext(Dispatchers.IO) { decodeSoftware(context, uri) }
-            if (bmp == null) { status = "Could not read that image."; return@launch }
+            var why = ""
+            val bmp = withContext(Dispatchers.IO) { decodeSoftware(context, uri) { why = it } }
+            if (bmp == null) { status = "Could not read that image. $why"; return@launch }
             sourceBitmap = bmp
             spec = null
             stickers = emptyList()
@@ -438,13 +440,57 @@ private fun rememberLauncherForPicker(onResult: (Uri?) -> Unit) =
         ActivityResultContracts.PickVisualMedia()
     ) { onResult(it) }
 
-private fun decodeSoftware(context: android.content.Context, uri: Uri): Bitmap? = try {
-    val src = ImageDecoder.createSource(context.contentResolver, uri)
-    ImageDecoder.decodeBitmap(src) { decoder, _, _ ->
-        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-        decoder.isMutableRequired = false
+/**
+ * Robust decode for any picked image. Handles Huawei/HEIC + huge sensor photos:
+ *  1) ImageDecoder, software allocator, downsample to <=2048px (avoids OOM).
+ *  2) Fallback to BitmapFactory stream decode with inSampleSize.
+ * Catches Throwable (incl. OutOfMemoryError). Reports the failure reason via [onError].
+ */
+private const val MAX_DIM = 2048
+
+private fun decodeSoftware(
+    context: android.content.Context,
+    uri: Uri,
+    onError: (String) -> Unit = {}
+): Bitmap? {
+    // 1) ImageDecoder with downscale
+    try {
+        val src = ImageDecoder.createSource(context.contentResolver, uri)
+        return ImageDecoder.decodeBitmap(src) { decoder, info, _ ->
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            decoder.isMutableRequired = false
+            val longest = maxOf(info.size.width, info.size.height)
+            if (longest > MAX_DIM) {
+                val k = MAX_DIM.toFloat() / longest
+                decoder.setTargetSize(
+                    (info.size.width * k).toInt().coerceAtLeast(1),
+                    (info.size.height * k).toInt().coerceAtLeast(1)
+                )
+            }
+        }
+    } catch (e: Throwable) {
+        onError("decoder: ${e.javaClass.simpleName} ${e.message ?: ""}".trim())
     }
-} catch (_: Exception) { null }
+    // 2) BitmapFactory stream fallback (covers codecs ImageDecoder rejected, plus OOM via sampling)
+    return try {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, bounds)
+        }
+        var sample = 1
+        while (bounds.outWidth / sample > MAX_DIM || bounds.outHeight / sample > MAX_DIM) sample *= 2
+        val opts = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        context.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, opts)
+        } ?: run { onError("no stream"); null }
+    } catch (e: Throwable) {
+        onError("bitmapfactory: ${e.javaClass.simpleName} ${e.message ?: ""}".trim())
+        null
+    }
+}
 
 private fun exportToGallery(context: android.content.Context, bmp: Bitmap): Boolean = try {
     val name = "thumb_${System.currentTimeMillis()}.png"
