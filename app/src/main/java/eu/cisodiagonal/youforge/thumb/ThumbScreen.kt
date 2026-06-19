@@ -11,7 +11,9 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
@@ -52,7 +54,7 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
     var spec by remember { mutableStateOf<OverlaySpec?>(null) }
     var description by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("build r6 · Pick a photo to start.") }
+    var status by remember { mutableStateOf("build r7 · Pick a photo to start.") }
     var showSettings by remember { mutableStateOf(false) }
     var modelReady by remember { mutableStateOf(modelMgr.isPresent()) }
     var stickers by remember { mutableStateOf<List<Sticker>>(emptyList()) }
@@ -314,7 +316,9 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                EffectPicker(sp.effect) { spec = sp.copy(effect = it); rerender() }
+                EffectStrip(sp.effect, sp.titleColor, sp.glowColor) {
+                    spec = sp.copy(effect = it); rerender()
+                }
                 PositionPicker(sp.position) { spec = sp.copy(position = it); rerender() }
                 SwatchRow("Title colour", titleSwatches) { spec = sp.copy(titleColor = it); rerender() }
                 if (sp.effect == TextEffect.GLOW || sp.effect == TextEffect.NEON) {
@@ -395,14 +399,47 @@ private fun PositionPicker(current: Position, onPick: (Position) -> Unit) {
     }
 }
 
+/** Horizontally-scrolling strip of live effect previews; tap a chip to apply it. */
 @Composable
-private fun EffectPicker(current: TextEffect, onPick: (TextEffect) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        OutlinedButton(onClick = { open = true }) { Text("Effect: ${current.label}") }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            TextEffect.entries.forEach { e ->
-                DropdownMenuItem(text = { Text(e.label) }, onClick = { onPick(e); open = false })
+private fun EffectStrip(
+    current: TextEffect,
+    titleColor: Int,
+    glowColor: Int,
+    onPick: (TextEffect) -> Unit
+) {
+    StickerGroupLabel("Effect")
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        TextEffect.entries.forEach { e ->
+            val chip = remember(e, titleColor, glowColor) {
+                ThumbnailRenderer.sampleChip(e, titleColor, glowColor).asImageBitmap()
+            }
+            val selected = e == current
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .border(
+                        BorderStroke(
+                            if (selected) 2.dp else 1.dp,
+                            if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outline
+                        ),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .clickable { onPick(e) }
+                    .padding(4.dp)
+            ) {
+                Image(
+                    bitmap = chip,
+                    contentDescription = e.label,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(width = 92.dp, height = 50.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                )
+                Text(e.label, style = MaterialTheme.typography.labelSmall)
             }
         }
     }

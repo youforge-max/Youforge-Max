@@ -48,6 +48,42 @@ object ThumbnailRenderer {
         return out
     }
 
+    /**
+     * Small standalone preview of a single [effect] (sample text on a dark chip),
+     * using the exact same layer stack as the real render. Used by the effect strip
+     * so each swatch is a true live preview of the current title/glow colours.
+     */
+    fun sampleChip(
+        effect: TextEffect,
+        titleColor: Int,
+        glowColor: Int,
+        wPx: Int = 240,
+        hPx: Int = 132
+    ): Bitmap {
+        val bmp = Bitmap.createBitmap(wPx, hPx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val bg = Paint().apply {
+            shader = LinearGradient(
+                0f, 0f, 0f, hPx.toFloat(),
+                Color.parseColor("#2A2F36"), Color.parseColor("#12151A"), Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(0f, 0f, wPx.toFloat(), hPx.toFloat(), bg)
+
+        val spec = OverlaySpec(
+            title = "Aa", effect = effect, titleColor = titleColor,
+            glowColor = glowColor, position = Position.CENTER, strokeColor = Color.BLACK
+        )
+        val tf = Typeface.create("sans-serif-black", Typeface.BOLD)
+        val size = hPx * 0.46f
+        drawTitleEffect(
+            canvas, spec, listOf("Aa"),
+            x = wPx / 2f, y0 = hPx / 2f + size * 0.36f,
+            lineH = size * 1.06f, size = size, tf = tf, align = Paint.Align.CENTER
+        )
+        return bmp
+    }
+
     private fun drawStickers(canvas: Canvas, context: Context, stickers: List<Sticker>) {
         if (stickers.isEmpty()) return
         val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
