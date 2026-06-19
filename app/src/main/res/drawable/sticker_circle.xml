@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp" android:height="100dp"
+    android:viewportWidth="100" android:viewportHeight="100">
+    <!-- hollow highlight ring -->
+    <path android:strokeColor="#FF3D3D" android:strokeWidth="7" android:fillColor="#00000000"
+        android:pathData="M9,50 a41,41 0 1,0 82,0 a41,41 0 1,0 -82,0 z" />
+</vector>

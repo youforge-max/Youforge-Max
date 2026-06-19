@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window/splash theme only; UI is Jetpack Compose (MaterialTheme). -->
+    <style name="Theme.YouForge" parent="android:Theme.Material.NoActionBar" />
+</resources>
