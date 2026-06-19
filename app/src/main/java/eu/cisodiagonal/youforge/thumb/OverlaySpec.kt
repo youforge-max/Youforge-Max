@@ -19,6 +19,22 @@ enum class Position(val id: String) {
     }
 }
 
+/** Title rendering style. The renderer draws a different layer stack per effect. */
+enum class TextEffect(val id: String, val label: String) {
+    SHADOW("shadow", "Shadow"),
+    OUTLINE("outline", "Bold outline"),
+    GLOW("glow", "Glow"),
+    NEON("neon", "Neon"),
+    GRADIENT("gradient", "Gradient"),
+    POP("pop", "Pop (white + stroke)"),
+    PLAIN("plain", "Plain");
+
+    companion object {
+        fun from(s: String?): TextEffect =
+            entries.firstOrNull { it.id.equals(s?.trim(), ignoreCase = true) } ?: GLOW
+    }
+}
+
 /**
  * The structured overlay the renderer draws onto the photo. Produced either by
  * the on-device LLM ([OnDeviceLlm]) or the offline [TemplateProvider].
@@ -30,7 +46,9 @@ data class OverlaySpec(
     val strokeColor: Int = Color.BLACK,
     val position: Position = Position.LOWER_LEFT,
     val mood: String = "",
-    val accent: String = ""        // single emoji, optional
+    val accent: String = "",       // single emoji, optional
+    val effect: TextEffect = TextEffect.GLOW,
+    val glowColor: Int = Color.parseColor("#FF2D7A")   // halo/accent for glow & neon
 ) {
     companion object {
         private fun color(hex: String?, fallback: Int): Int =
@@ -56,7 +74,9 @@ data class OverlaySpec(
                     strokeColor = color(o.optString("stroke_color"), Color.BLACK),
                     position = Position.from(o.optString("position")),
                     mood = o.optString("mood").trim().take(24),
-                    accent = o.optString("accent").trim().take(4)
+                    accent = o.optString("accent").trim().take(4),
+                    effect = TextEffect.from(o.optString("effect")),
+                    glowColor = color(o.optString("glow_color"), Color.parseColor("#FF2D7A"))
                 )
             } catch (_: Exception) {
                 null

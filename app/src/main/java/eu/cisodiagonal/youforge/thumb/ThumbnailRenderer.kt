@@ -2,6 +2,7 @@ package eu.cisodiagonal.youforge.thumb
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -132,56 +133,139 @@ object ThumbnailRenderer {
         val title = (spec.accent.takeIf { it.isNotBlank() }?.let { "$it " } ?: "") +
             spec.title.uppercase()
 
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = spec.titleColor
-            typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
-            textAlign = alignFor(spec.position)
-            setShadowLayer(10f, 0f, 6f, Color.argb(160, 0, 0, 0))
-        }
-        val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = spec.strokeColor
-            typeface = fill.typeface
-            textAlign = fill.textAlign
-            style = Paint.Style.STROKE
-        }
+        val tf = Typeface.create("sans-serif-black", Typeface.BOLD)
+        val align = alignFor(spec.position)
+        val measure = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = tf; textAlign = align }
 
         // Auto-fit: shrink until the title wraps into <= MAX_LINES within the safe width.
         val maxW = W - 2 * PAD
         var size = 150f
         var lines: List<String>
         while (true) {
-            fill.textSize = size
-            lines = wrap(title, fill, maxW)
+            measure.textSize = size
+            lines = wrap(title, measure, maxW)
             if (lines.size <= MAX_LINES || size <= 56f) break
             size -= 6f
         }
-        stroke.textSize = size
-        stroke.strokeWidth = size * 0.085f
 
         val lineH = size * 1.06f
         val subSize = size * 0.42f
-        val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-            textAlign = fill.textAlign
-            textSize = subSize
-            setShadowLayer(8f, 0f, 4f, Color.argb(180, 0, 0, 0))
-        }
         val hasSub = spec.subtitle.isNotBlank()
         val blockH = lines.size * lineH + if (hasSub) subSize * 1.4f else 0f
 
         val x = anchorX(spec.position)
-        var y = anchorTop(spec.position, blockH) + size   // baseline of first line
+        val y0 = anchorTop(spec.position, blockH) + size   // baseline of first line
 
-        for (line in lines) {
-            canvas.drawText(line, x, y, stroke)
-            canvas.drawText(line, x, y, fill)
-            y += lineH
-        }
+        drawTitleEffect(canvas, spec, lines, x, y0, lineH, size, tf, align)
+
         if (hasSub) {
-            canvas.drawText(spec.subtitle.uppercase(), x, y + subSize * 0.1f, subPaint)
+            val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                textAlign = align
+                textSize = subSize
+                setShadowLayer(8f, 0f, 4f, Color.argb(180, 0, 0, 0))
+            }
+            val subY = y0 + (lines.size - 1) * lineH + lineH * 0.95f
+            canvas.drawText(spec.subtitle.uppercase(), x, subY, subPaint)
         }
     }
+
+    /** Draws the title's [lines] with the layer stack for [OverlaySpec.effect]. */
+    private fun drawTitleEffect(
+        canvas: Canvas,
+        spec: OverlaySpec,
+        lines: List<String>,
+        x: Float,
+        y0: Float,
+        lineH: Float,
+        size: Float,
+        tf: Typeface,
+        align: Paint.Align
+    ) {
+        fun basePaint() = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = tf; textAlign = align; textSize = size
+        }
+        fun lines(p: Paint) { var y = y0; for (l in lines) { canvas.drawText(l, x, y, p); y += lineH } }
+
+        val fill = basePaint().apply { color = spec.titleColor }
+        val stroke = basePaint().apply {
+            style = Paint.Style.STROKE; color = spec.strokeColor; strokeWidth = size * 0.085f
+        }
+
+        when (spec.effect) {
+            TextEffect.PLAIN -> { lines(stroke); lines(fill) }
+
+            TextEffect.SHADOW -> {
+                fill.setShadowLayer(14f, 0f, 9f, Color.argb(175, 0, 0, 0))
+                lines(stroke); lines(fill)
+            }
+
+            TextEffect.OUTLINE -> {
+                stroke.strokeWidth = size * 0.14f
+                lines(stroke); lines(fill)
+            }
+
+            TextEffect.GLOW -> {
+                val glow = basePaint().apply {
+                    color = spec.glowColor
+                    maskFilter = BlurMaskFilter(size * 0.22f, BlurMaskFilter.Blur.NORMAL)
+                }
+                lines(glow); lines(glow)                 // doubled = brighter halo
+                val edge = basePaint().apply {
+                    style = Paint.Style.STROKE; color = Color.argb(220, 0, 0, 0)
+                    strokeWidth = size * 0.05f
+                }
+                lines(edge); lines(fill)
+            }
+
+            TextEffect.NEON -> {
+                val glow = basePaint().apply {
+                    color = spec.glowColor
+                    maskFilter = BlurMaskFilter(size * 0.30f, BlurMaskFilter.Blur.NORMAL)
+                }
+                lines(glow); lines(glow); lines(glow)
+                val edge = basePaint().apply {
+                    style = Paint.Style.STROKE; color = spec.glowColor; strokeWidth = size * 0.045f
+                }
+                val core = basePaint().apply { color = Color.WHITE }
+                lines(edge); lines(core)                 // white-hot core in a coloured glow
+            }
+
+            TextEffect.GRADIENT -> {
+                val top = y0 - size * 0.85f
+                val bottom = y0 + (lines.size - 1) * lineH + size * 0.2f
+                fill.shader = LinearGradient(
+                    0f, top, 0f, bottom,
+                    intArrayOf(lighten(spec.titleColor, 0.35f), spec.titleColor, darken(spec.titleColor, 0.25f)),
+                    floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP
+                )
+                fill.setShadowLayer(12f, 0f, 7f, Color.argb(160, 0, 0, 0))
+                stroke.strokeWidth = size * 0.06f
+                lines(stroke); lines(fill)
+            }
+
+            TextEffect.POP -> {
+                stroke.color = spec.titleColor
+                stroke.strokeWidth = size * 0.15f
+                stroke.setShadowLayer(16f, 0f, 10f, Color.argb(185, 0, 0, 0))
+                fill.color = Color.WHITE
+                lines(stroke); lines(fill)
+            }
+        }
+    }
+
+    private fun lighten(c: Int, f: Float): Int = Color.rgb(
+        (Color.red(c) + (255 - Color.red(c)) * f).roundToInt().coerceIn(0, 255),
+        (Color.green(c) + (255 - Color.green(c)) * f).roundToInt().coerceIn(0, 255),
+        (Color.blue(c) + (255 - Color.blue(c)) * f).roundToInt().coerceIn(0, 255)
+    )
+
+    private fun darken(c: Int, f: Float): Int = Color.rgb(
+        (Color.red(c) * (1 - f)).roundToInt().coerceIn(0, 255),
+        (Color.green(c) * (1 - f)).roundToInt().coerceIn(0, 255),
+        (Color.blue(c) * (1 - f)).roundToInt().coerceIn(0, 255)
+    )
 
     private fun alignFor(pos: Position): Paint.Align = when (pos) {
         Position.UPPER_CENTER, Position.CENTER, Position.LOWER_CENTER -> Paint.Align.CENTER

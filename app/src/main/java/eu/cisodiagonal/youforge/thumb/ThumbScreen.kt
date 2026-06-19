@@ -52,7 +52,7 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
     var spec by remember { mutableStateOf<OverlaySpec?>(null) }
     var description by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("build r5 · Pick a photo to start.") }
+    var status by remember { mutableStateOf("build r6 · Pick a photo to start.") }
     var showSettings by remember { mutableStateOf(false) }
     var modelReady by remember { mutableStateOf(modelMgr.isPresent()) }
     var stickers by remember { mutableStateOf<List<Sticker>>(emptyList()) }
@@ -314,8 +314,12 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+                EffectPicker(sp.effect) { spec = sp.copy(effect = it); rerender() }
                 PositionPicker(sp.position) { spec = sp.copy(position = it); rerender() }
                 SwatchRow("Title colour", titleSwatches) { spec = sp.copy(titleColor = it); rerender() }
+                if (sp.effect == TextEffect.GLOW || sp.effect == TextEffect.NEON) {
+                    SwatchRow("Glow colour", glowSwatches) { spec = sp.copy(glowColor = it); rerender() }
+                }
             }
 
             // Export — available once a photo is loaded (title optional)
@@ -390,6 +394,24 @@ private fun PositionPicker(current: Position, onPick: (Position) -> Unit) {
         }
     }
 }
+
+@Composable
+private fun EffectPicker(current: TextEffect, onPick: (TextEffect) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { open = true }) { Text("Effect: ${current.label}") }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            TextEffect.entries.forEach { e ->
+                DropdownMenuItem(text = { Text(e.label) }, onClick = { onPick(e); open = false })
+            }
+        }
+    }
+}
+
+private val glowSwatches = listOf(
+    0xFFFF2D7A.toInt(), 0xFF00E5FF.toInt(), 0xFF7C4DFF.toInt(),
+    0xFF3DFF6E.toInt(), 0xFFFFA63D.toInt(), 0xFFFFFFFF.toInt()
+)
 
 @Composable
 private fun ModelDialog(

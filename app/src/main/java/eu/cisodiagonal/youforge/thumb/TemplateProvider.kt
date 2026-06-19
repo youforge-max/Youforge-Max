@@ -13,17 +13,27 @@ object TemplateProvider : AiProvider {
         "i", "is", "are", "at", "it", "this", "that", "title", "video", "thumbnail", "about"
     )
 
-    private data class Mood(val keys: List<String>, val title: Int, val stroke: Int, val mood: String)
+    private data class Mood(
+        val keys: List<String>, val title: Int, val stroke: Int, val mood: String,
+        val effect: TextEffect, val glow: Int
+    )
 
     private val MOODS = listOf(
         Mood(listOf("moody", "dark", "night", "storm", "cold", "alone", "scary", "danger"),
-            Color.parseColor("#FFEC3D"), Color.BLACK, "moody"),
+            Color.parseColor("#FFEC3D"), Color.BLACK, "moody",
+            TextEffect.GLOW, Color.parseColor("#FF2D7A")),
         Mood(listOf("bright", "sunny", "summer", "happy", "fun", "beach", "warm"),
-            Color.WHITE, Color.parseColor("#0A6CC2"), "bright"),
+            Color.WHITE, Color.parseColor("#0A6CC2"), "bright",
+            TextEffect.OUTLINE, Color.parseColor("#FFD83D")),
         Mood(listOf("nature", "forest", "river", "wild", "camp", "mountain", "green"),
-            Color.parseColor("#B6FF3D"), Color.parseColor("#0E2B12"), "nature"),
+            Color.parseColor("#B6FF3D"), Color.parseColor("#0E2B12"), "nature",
+            TextEffect.GRADIENT, Color.parseColor("#3DFFB0")),
         Mood(listOf("epic", "extreme", "insane", "crazy", "record", "fastest", "biggest"),
-            Color.parseColor("#FF3D3D"), Color.WHITE, "epic")
+            Color.parseColor("#FF3D3D"), Color.WHITE, "epic",
+            TextEffect.POP, Color.parseColor("#FF2D2D")),
+        Mood(listOf("gaming", "neon", "cyber", "tech", "stream", "live", "rgb"),
+            Color.parseColor("#00E5FF"), Color.BLACK, "neon",
+            TextEffect.NEON, Color.parseColor("#00E5FF"))
     )
 
     override suspend fun suggest(description: String): OverlaySpec {
@@ -41,7 +51,9 @@ object TemplateProvider : AiProvider {
             strokeColor = mood?.stroke ?: Color.BLACK,
             position = Position.LOWER_LEFT,
             mood = mood?.mood ?: "",
-            accent = accentFor(lower)
+            accent = accentFor(lower),
+            effect = mood?.effect ?: TextEffect.GLOW,
+            glowColor = mood?.glow ?: Color.parseColor("#FF2D7A")
         )
     }
 
