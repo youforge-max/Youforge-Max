@@ -31,18 +31,24 @@ object Stickers {
         "Circle" to R.drawable.sticker_circle
     )
 
-    val emoji: List<String> = listOf(
-        // reactions
-        "😮", "😱", "😨", "🤯", "😭", "😂", "🤩", "😍", "🥶", "🤔", "😎", "👀", "😤",
-        // hands / pointers
-        "👉", "👆", "👇", "👍", "👎", "🙌", "👏", "🤙", "💪",
-        // marks / emphasis
-        "✅", "❌", "⭐", "💯", "❓", "❗", "🔥", "💥", "⚡", "✨", "🎯", "⚠️", "🚫", "🆕",
-        // camping / outdoors / nature
-        "🏕️", "⛺", "🌲", "🌳", "⛰️", "🏔️", "🌊", "💧", "🌧️", "🌙", "☀️", "❄️", "🌡️",
-        "🎣", "🐟", "🦌", "🦊", "🐗", "🦉", "🪵", "🪓", "🔦", "🧭", "🥾", "🎒", "🔪",
-        // clickbait misc
-        "💀", "👑", "💰", "⏰", "🆘", "🔴"
+    /** Emoji grouped by theme; the UI shows each group's label above its row. */
+    val emojiGroups: List<Pair<String, List<String>>> = listOf(
+        "Reactions" to listOf(
+            "😮", "😱", "😨", "🤯", "😭", "😂", "🤩", "😍", "🥶", "🤔", "😎", "👀", "😤"
+        ),
+        "Hands" to listOf(
+            "👉", "👆", "👇", "👍", "👎", "🙌", "👏", "🤙", "💪"
+        ),
+        "Marks" to listOf(
+            "✅", "❌", "⭐", "💯", "❓", "❗", "🔥", "💥", "⚡", "✨", "🎯", "⚠️", "🚫", "🆕"
+        ),
+        "Outdoors" to listOf(
+            "🏕️", "⛺", "🌲", "🌳", "⛰️", "🏔️", "🌊", "💧", "🌧️", "🌙", "☀️", "❄️", "🌡️",
+            "🎣", "🐟", "🦌", "🦊", "🐗", "🦉", "🪵", "🪓", "🔦", "🧭", "🥾", "🎒", "🔪"
+        ),
+        "Extra" to listOf(
+            "💀", "👑", "💰", "⏰", "🆘", "🔴"
+        )
     )
 
     /** Sensible starting width (fraction of canvas width) per sticker kind. */

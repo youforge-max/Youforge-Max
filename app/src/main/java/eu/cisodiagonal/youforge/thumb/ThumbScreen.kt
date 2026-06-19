@@ -52,7 +52,7 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
     var spec by remember { mutableStateOf<OverlaySpec?>(null) }
     var description by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("build r4 · Pick a photo to start.") }
+    var status by remember { mutableStateOf("build r5 · Pick a photo to start.") }
     var showSettings by remember { mutableStateOf(false) }
     var modelReady by remember { mutableStateOf(modelMgr.isPresent()) }
     var stickers by remember { mutableStateOf<List<Sticker>>(emptyList()) }
@@ -235,6 +235,8 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
             if (sourceBitmap != null) {
                 HorizontalDivider()
                 Text("Stickers", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+
+                StickerGroupLabel("Shapes")
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -254,11 +256,21 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
                     OutlinedButton(onClick = { addSticker(StickerKind.Subscribe) }) {
                         Text("Subscribe")
                     }
-                    Stickers.emoji.forEach { e ->
-                        OutlinedButton(
-                            onClick = { addSticker(StickerKind.Emoji(e)) },
-                            contentPadding = PaddingValues(horizontal = 10.dp)
-                        ) { Text(e, style = MaterialTheme.typography.titleLarge) }
+                }
+
+                Stickers.emojiGroups.forEach { (label, glyphs) ->
+                    StickerGroupLabel(label)
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        glyphs.forEach { e ->
+                            OutlinedButton(
+                                onClick = { addSticker(StickerKind.Emoji(e)) },
+                                contentPadding = PaddingValues(horizontal = 10.dp)
+                            ) { Text(e, style = MaterialTheme.typography.titleLarge) }
+                        }
                     }
                 }
                 if (selectedId != null) {
@@ -337,6 +349,16 @@ private val titleSwatches = listOf(
     0xFFFFEC3D.toInt(), 0xFFFFFFFF.toInt(), 0xFFFF3D3D.toInt(),
     0xFFB6FF3D.toInt(), 0xFF3DC6FF.toInt(), 0xFFFF8A3D.toInt()
 )
+
+@Composable
+private fun StickerGroupLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.outline
+    )
+}
 
 @Composable
 private fun SwatchRow(label: String, colors: List<Int>, onPick: (Int) -> Unit) {
