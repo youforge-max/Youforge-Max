@@ -86,13 +86,10 @@ object SuggestedModels {
             "tinyllama-1_1b", "TinyLlama-1.1B-Chat", "~1.15 GB", "Small · snappy · no login",
             "$BASE/TinyLlama-1.1B-Chat-v1.0/resolve/main/" +
                 "TinyLlama-1.1B-Chat-v1.0_multi-prefill-seq_q8_ekv1280.task"
-        ),
-        SuggestedModel(
-            "deepseek-r1-qwen-1_5b", "DeepSeek-R1-Distill-Qwen-1.5B", "~1.86 GB",
-            "Smarter · slower · no login",
-            "$BASE/DeepSeek-R1-Distill-Qwen-1.5B/resolve/main/" +
-                "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv1280.task"
         )
+        // NB: DeepSeek-R1-Distill is intentionally omitted — it is a reasoning
+        // model that emits <think>…</think> spans, which derails the short-title
+        // JSON the renderer expects. Instruct models only here.
     )
 
     fun bySlug(slug: String): SuggestedModel? = all.firstOrNull { it.slug == slug }

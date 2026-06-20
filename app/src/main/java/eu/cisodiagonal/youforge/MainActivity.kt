@@ -36,20 +36,34 @@ private enum class Tool { Home, Video, Thumb }
 @Composable
 fun YouForgeApp() {
     var tool by remember { mutableStateOf(Tool.Home) }
+    // Once the Thumbnail Maker is opened, keep it composed so an in-progress edit
+    // (photo, title, stickers, model state) survives bouncing back to Home.
+    var thumbVisited by remember { mutableStateOf(false) }
+    if (tool == Tool.Thumb) thumbVisited = true
 
     BackHandler(enabled = tool != Tool.Home) { tool = Tool.Home }
 
-    when (tool) {
-        Tool.Home -> HomeScreen(onOpen = { tool = it })
-        Tool.Thumb -> ThumbnailScreen(onBack = { tool = Tool.Home })
-        Tool.Video -> Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("Video Normalizer") },
-                    navigationIcon = { TextButton(onClick = { tool = Tool.Home }) { Text("←") } }
-                )
+    Box(Modifier.fillMaxSize()) {
+        when (tool) {
+            Tool.Home -> HomeScreen(onOpen = { tool = it })
+            Tool.Thumb -> Unit  // rendered by the keep-alive block below
+            Tool.Video -> Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { Text("Video Normalizer") },
+                        navigationIcon = { TextButton(onClick = { tool = Tool.Home }) { Text("←") } }
+                    )
+                }
+            ) { pad -> Box(Modifier.padding(pad)) { VideoNormalizerScreen() } }
+        }
+
+        // Thumbnail Maker is never removed once visited — fills the screen when
+        // active, collapses to zero size (state retained) when another screen shows.
+        if (thumbVisited) {
+            Box(if (tool == Tool.Thumb) Modifier.fillMaxSize() else Modifier.size(0.dp)) {
+                ThumbnailScreen(onBack = { tool = Tool.Home })
             }
-        ) { pad -> Box(Modifier.padding(pad)) { VideoNormalizerScreen() } }
+        }
     }
 }
 
