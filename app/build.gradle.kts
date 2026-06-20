@@ -11,12 +11,29 @@ android {
         applicationId = "eu.cisodiagonal.youforge"
         minSdk = 29              // MediaPipe GenAI runs on 24+; SAF + Compose fine on 29
         targetSdk = 35
-        versionCode = 15
-        versionName = "1.0-r15"
+        versionCode = 16
+        versionName = "1.0-r16"
 
         // Tablet is arm64; drop the other ABIs' native libs to slim the APK.
         ndk { abiFilters += "arm64-v8a" }
+
+        // GGUF backend (llama.cpp via NDK). c++_shared so the STL is shared with
+        // the other native libs (MediaPipe/Vosk) instead of duplicated.
+        externalNativeBuild {
+            cmake {
+                arguments += "-DANDROID_STL=c++_shared"
+                cppFlags += "-O3"
+            }
+        }
     }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+    ndkVersion = "26.3.11579264"
 
     signingConfigs {
         create("release") {
