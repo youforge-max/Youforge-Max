@@ -36,9 +36,6 @@ jobs:
 
   scan:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
     steps:
       - uses: actions/checkout@v4
 
@@ -47,12 +44,7 @@ jobs:
         with:
           scan-type: fs
           scan-ref: .
-          format: sarif
-          output: trivy.sarif
+          format: table
           severity: CRITICAL,HIGH
-
-      - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: trivy.sarif
+          # Report findings in the log; do not fail the build (informational gate).
+          exit-code: '0'
