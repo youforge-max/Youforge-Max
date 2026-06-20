@@ -11,8 +11,8 @@ android {
         applicationId = "eu.cisodiagonal.youforge"
         minSdk = 29              // MediaPipe GenAI runs on 24+; SAF + Compose fine on 29
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.0-r9"
+        versionCode = 10
+        versionName = "1.0-r10"
 
         // Tablet is arm64; drop the other ABIs' native libs to slim the APK.
         ndk { abiFilters += "arm64-v8a" }
@@ -52,6 +52,9 @@ android {
 
     buildFeatures { compose = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
+
+    // MediaPipe mmaps .tflite straight from the APK — must stay uncompressed.
+    androidResources { noCompress += "tflite" }
 }
 
 dependencies {
@@ -66,5 +69,8 @@ dependencies {
 
     // On-device LLM (Gemma-2 2B .task) for the smart overlay suggestions.
     implementation("com.google.mediapipe:tasks-genai:0.10.24")
+    // On-device vision: selfie segmentation (background removal) + face detection
+    // (auto-crop). Models bundled in assets — fully offline, no cloud.
+    implementation("com.google.mediapipe:tasks-vision:0.10.14")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

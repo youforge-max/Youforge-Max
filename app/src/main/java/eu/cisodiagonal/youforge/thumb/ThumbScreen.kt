@@ -51,11 +51,12 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
     val settings = remember { Settings(context) }
 
     var sourceBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var rendered by remember { mutableStateOf<Bitmap?>(null) }
     var spec by remember { mutableStateOf<OverlaySpec?>(null) }
     var description by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("build r9 · Pick a photo to start.") }
+    var status by remember { mutableStateOf("build r10 · Pick a photo to start.") }
     var showSettings by remember { mutableStateOf(false) }
     var modelReady by remember { mutableStateOf(modelMgr.isPresent()) }
     var stickers by remember { mutableStateOf<List<Sticker>>(emptyList()) }
@@ -98,6 +99,7 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
             val bmp = withContext(Dispatchers.IO) { decodeSoftware(context, uri) { why = it } }
             if (bmp == null) { status = "Could not read that image. $why"; return@launch }
             sourceBitmap = bmp
+            originalBitmap = bmp
             spec = null
             stickers = emptyList()
             selectedId = null
@@ -269,6 +271,48 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
 
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             Text(status, style = MaterialTheme.typography.bodySmall)
+
+            // Photo tools — on-device MediaPipe (background removal + face framing).
+            if (sourceBitmap != null) {
+                HorizontalDivider()
+                Text("Photo (on-device AI)", style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold)
+
+                fun applyPhotoOp(label: String, op: (Bitmap) -> Bitmap?) {
+                    val src = sourceBitmap ?: return
+                    scope.launch {
+                        busy = true; status = "$label…"
+                        val res = withContext(Dispatchers.Default) { op(src) }
+                        busy = false
+                        if (res == null) { status = "$label: nothing detected."; return@launch }
+                        sourceBitmap = res
+                        rerender()
+                        status = "$label done."
+                    }
+                }
+
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(enabled = !busy, onClick = {
+                        applyPhotoOp("Cut out (dark bg)") {
+                            VisionTools.removeBackground(context, it, VisionTools.BackgroundStyle.DARK)
+                        }
+                    }) { Text("Cut out · dark") }
+                    OutlinedButton(enabled = !busy, onClick = {
+                        applyPhotoOp("Cut out (blur bg)") {
+                            VisionTools.removeBackground(context, it, VisionTools.BackgroundStyle.BLUR)
+                        }
+                    }) { Text("Cut out · blur") }
+                    OutlinedButton(enabled = !busy, onClick = {
+                        applyPhotoOp("Auto-frame face") { VisionTools.autoCropToFace(context, it) }
+                    }) { Text("Auto-frame face") }
+                    OutlinedButton(enabled = !busy && sourceBitmap !== originalBitmap, onClick = {
+                        originalBitmap?.let { sourceBitmap = it; rerender(); status = "Photo restored." }
+                    }) { Text("Restore photo") }
+                }
+            }
 
             // Sticker palette (offline; tap to add, then drag on preview)
             if (sourceBitmap != null) {
