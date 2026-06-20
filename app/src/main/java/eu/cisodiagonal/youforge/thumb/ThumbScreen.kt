@@ -55,7 +55,7 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
     var spec by remember { mutableStateOf<OverlaySpec?>(null) }
     var description by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("build r8 · Pick a photo to start.") }
+    var status by remember { mutableStateOf("build r9 · Pick a photo to start.") }
     var showSettings by remember { mutableStateOf(false) }
     var modelReady by remember { mutableStateOf(modelMgr.isPresent()) }
     var stickers by remember { mutableStateOf<List<Sticker>>(emptyList()) }
@@ -113,14 +113,15 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
         scope.launch {
             busy = true
             try {
-                val sp = if (useAi && modelMgr.isPresent()) {
+                val sp0 = if (useAi && modelMgr.isPresent()) {
                     status = "AI thinking (on-device)…"
                     OnDeviceLlm(context, modelMgr.modelFile).suggest(description)
                 } else {
                     if (useAi) status = "No model yet — used offline template."
                     TemplateProvider.suggest(description)
                 }
-                spec = sp
+                // Brand kit (if saved) overrides the generated style for consistency.
+                spec = settings.brandKit()?.applyTo(sp0) ?: sp0
                 rerender()
                 if (status.startsWith("AI thinking")) status = "Done. Tweak below or export."
             } catch (e: Exception) {
@@ -348,9 +349,10 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
                 OutlinedTextField(
                     value = sp.title,
                     onValueChange = { spec = sp.copy(title = it); rerender() },
-                    label = { Text("Title") },
+                    label = { Text("Title (Enter = line break)") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = false,
+                    minLines = 1
                 )
                 OutlinedTextField(
                     value = sp.subtitle,
@@ -391,6 +393,62 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
                 if (sp.effect == TextEffect.GLOW || sp.effect == TextEffect.NEON) {
                     SwatchRow("Glow colour", glowSwatches) { spec = sp.copy(glowColor = it); rerender() }
                 }
+
+                // One-tap style presets.
+                StickerGroupLabel("Style presets")
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Presets.builtin.forEach { p ->
+                        OutlinedButton(onClick = { spec = p.applyTo(sp); rerender() }) { Text(p.name) }
+                    }
+                }
+
+                // Brand kit — save the current style and reuse it on future thumbnails.
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(onClick = {
+                        settings.saveBrandKit(sp); status = "Saved as your style."
+                    }) { Text("Save as my style") }
+                    if (settings.brandKit() != null) {
+                        OutlinedButton(onClick = {
+                            settings.brandKit()?.let { spec = it.applyTo(sp); rerender() }
+                        }) { Text("Use my style") }
+                        OutlinedButton(onClick = {
+                            settings.clearBrandKit(); status = "Brand style cleared."
+                        }) { Text("Clear") }
+                    }
+                }
+
+                // Legibility check: contrast of the title colour vs the photo behind it.
+                sourceBitmap?.let { src ->
+                    val bg = remember(sp.title, sp.position, sp.freeX, sp.freeY, sp.titleScale, src) {
+                        ThumbnailRenderer.bgColorUnderTitle(src, sp)
+                    }
+                    val v = Contrast.check(sp.titleColor, bg)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            (if (v.ok) "✓ " else "⚠ ") + v.advice +
+                                "  (" + String.format("%.1f", v.ratio) + ":1)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (v.ok) MaterialTheme.colorScheme.outline
+                            else MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (!v.ok && v.suggest != null) {
+                            OutlinedButton(onClick = {
+                                spec = sp.copy(titleColor = v.suggest); rerender()
+                            }) { Text("Fix") }
+                        }
+                    }
+                }
             }
 
             // Export — available once a photo is loaded (title optional)
@@ -406,6 +464,31 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Export 1280×720 PNG") }
+
+                // A/B variants — same photo + stickers, 3 different title styles.
+                spec?.let { base ->
+                    OutlinedButton(
+                        onClick = {
+                            val src = sourceBitmap ?: return@OutlinedButton
+                            scope.launch {
+                                busy = true
+                                val variants = Variants.make(base, 3)
+                                val ok = withContext(Dispatchers.IO) {
+                                    variants.mapIndexed { i, v ->
+                                        val bmp = ThumbnailRenderer.render(context, src, v, stickers)
+                                        exportToGallery(context, bmp, "ab${i + 1}")
+                                    }.all { it }
+                                }
+                                busy = false
+                                status = if (ok) "Saved ${variants.size} A/B variants to Pictures/YouForge."
+                                    else "Variant export failed."
+                                Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Export 3 A/B variants") }
+                }
             }
         }
     }
@@ -712,8 +795,9 @@ private fun decodeSoftware(
     }
 }
 
-private fun exportToGallery(context: android.content.Context, bmp: Bitmap): Boolean = try {
-    val name = "thumb_${System.currentTimeMillis()}.png"
+private fun exportToGallery(context: android.content.Context, bmp: Bitmap, tag: String = ""): Boolean = try {
+    val suffix = if (tag.isNotEmpty()) "_$tag" else ""
+    val name = "thumb_${System.currentTimeMillis()}$suffix.png"
     val values = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, name)
         put(MediaStore.Images.Media.MIME_TYPE, "image/png")

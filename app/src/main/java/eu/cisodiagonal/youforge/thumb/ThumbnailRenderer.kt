@@ -24,7 +24,7 @@ object ThumbnailRenderer {
     const val W = 1280
     const val H = 720
     private const val PAD = 56f          // safe-zone padding
-    private const val MAX_LINES = 2
+    private const val MAX_LINES = 3
 
     /**
      * Full compositor. [spec] may be null (photo + stickers only, before the AI/template
@@ -105,6 +105,38 @@ object ThumbnailRenderer {
             lineH = size * 1.06f, size = size, tf = tf, align = Paint.Align.CENTER
         )
         return bmp
+    }
+
+    /**
+     * Average colour of the photo behind the title block (after the center-crop
+     * mapping), for the contrast check. Samples a coarse grid inside the title box.
+     */
+    fun bgColorUnderTitle(source: Bitmap, spec: OverlaySpec): Int {
+        val tb = titleBoundsNorm(spec) ?: return 0xFF808080.toInt()
+        val scale = max(W.toFloat() / source.width, H.toFloat() / source.height)
+        val dw = source.width * scale
+        val dh = source.height * scale
+        val left = (W - dw) / 2f
+        val top = (H - dh) / 2f
+        val x0 = (tb.left * W).toInt(); val x1 = (tb.right * W).toInt()
+        val y0 = (tb.top * H).toInt(); val y1 = (tb.bottom * H).toInt()
+        val stepX = max(1, (x1 - x0) / 12)
+        val stepY = max(1, (y1 - y0) / 8)
+        val samples = ArrayList<Int>()
+        var cy = y0
+        while (cy <= y1) {
+            var cx = x0
+            while (cx <= x1) {
+                val sx = ((cx - left) / scale).toInt()
+                val sy = ((cy - top) / scale).toInt()
+                if (sx in 0 until source.width && sy in 0 until source.height) {
+                    samples.add(source.getPixel(sx, sy))
+                }
+                cx += stepX
+            }
+            cy += stepY
+        }
+        return Contrast.averageColor(samples.toIntArray())
     }
 
     private fun drawStickers(canvas: Canvas, context: Context, stickers: List<Sticker>) {
@@ -214,13 +246,15 @@ object ThumbnailRenderer {
         val align = if (free) Paint.Align.CENTER else alignFor(spec.position)
         val measure = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = tf; textAlign = align }
 
-        // Auto-fit: shrink until the title wraps into <= MAX_LINES within the safe width.
+        // Auto-fit: shrink until the title wraps into <= MAX_LINES within the safe
+        // width. Explicit '\n' in the title forces hard breaks before greedy wrap.
+        val rawLines = title.split('\n')
         val maxW = W - 2 * PAD
         var size = 150f
         var lines: List<String>
         while (true) {
             measure.textSize = size
-            lines = wrap(title, measure, maxW)
+            lines = rawLines.flatMap { wrap(it, measure, maxW) }
             if (lines.size <= MAX_LINES || size <= 56f) break
             size -= 6f
         }

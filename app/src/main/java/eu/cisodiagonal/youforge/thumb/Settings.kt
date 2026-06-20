@@ -10,8 +10,35 @@ class Settings(context: Context) {
         get() = prefs.getString(KEY_MODEL_URL, DEFAULT_MODEL_URL) ?: DEFAULT_MODEL_URL
         set(value) = prefs.edit().putString(KEY_MODEL_URL, value.trim()).apply()
 
+    /** The user's saved "brand kit" title style, or null if none saved. */
+    fun brandKit(): StylePreset? {
+        if (!prefs.getBoolean(KEY_BRAND_SET, false)) return null
+        return StylePreset(
+            name = "My style",
+            effect = TextEffect.from(prefs.getString(KEY_BRAND_EFFECT, null)),
+            titleColor = prefs.getInt(KEY_BRAND_TCOLOR, 0xFFFFEC3D.toInt()),
+            glowColor = prefs.getInt(KEY_BRAND_GCOLOR, 0xFF2D7A.toInt()),
+            position = Position.from(prefs.getString(KEY_BRAND_POS, null))
+        )
+    }
+
+    fun saveBrandKit(s: OverlaySpec) = prefs.edit()
+        .putBoolean(KEY_BRAND_SET, true)
+        .putString(KEY_BRAND_EFFECT, s.effect.id)
+        .putInt(KEY_BRAND_TCOLOR, s.titleColor)
+        .putInt(KEY_BRAND_GCOLOR, s.glowColor)
+        .putString(KEY_BRAND_POS, s.position.id)
+        .apply()
+
+    fun clearBrandKit() = prefs.edit().putBoolean(KEY_BRAND_SET, false).apply()
+
     companion object {
         private const val KEY_MODEL_URL = "model_url"
+        private const val KEY_BRAND_SET = "brand_set"
+        private const val KEY_BRAND_EFFECT = "brand_effect"
+        private const val KEY_BRAND_TCOLOR = "brand_tcolor"
+        private const val KEY_BRAND_GCOLOR = "brand_gcolor"
+        private const val KEY_BRAND_POS = "brand_pos"
 
         // Ungated, no-login MediaPipe .task: Qwen2.5-1.5B-Instruct (Apache-2.0, ~1.6 GB).
         val DEFAULT_MODEL_URL = SuggestedModels.all.first().url
