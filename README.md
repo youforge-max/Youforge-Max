@@ -16,9 +16,13 @@ fully offline, even in airplane mode. The app declares a single permission:
 `INTERNET` (for those model downloads).
 
 - **Package:** `eu.cisodiagonal.youforge`
-- **Platform:** Android (minSdk 29 / Android 10+), arm64-v8a
-- **Built with:** Kotlin · Jetpack Compose · Material 3
-- **License:** see [License](#license)
+- **Version:** 1.0-r17 (versionCode 17)
+- **Platform:** Android 10+ (API 29 → 35), 64-bit ARM (`arm64-v8a`)
+- **Built with:** Kotlin 2.4 · Jetpack Compose · Material 3 · NDK (llama.cpp)
+- **License:** [Apache-2.0](LICENSE)
+
+For the step-by-step user guide, see **[MANUAL.md](MANUAL.md)**. For version
+history and device notes, see **[CHANGELOG.md](CHANGELOG.md)**.
 
 ---
 
@@ -36,12 +40,19 @@ leaves the device, there's no account, no subscription, and no rate limit.
 ### Thumbnail Maker
 
 **AI title (on-device LLM)**
-- Describe the video in a sentence; a small instruct model (Qwen / Gemma / Llama,
-  MediaPipe `.task`) writes a punchy title + style as JSON, which the renderer
-  composites onto the photo.
-- **Multiple models side-by-side** — download several, switch the active one
-  instantly (no re-download). One-tap **"Download all"**, per-model download
-  progress, custom `.task` URL, or import a `.task` you already have.
+- Describe the video in a sentence; a small instruct model writes a punchy title +
+  style as JSON, which the renderer composites onto the photo.
+- **Two on-device engines, one picker:**
+  - **MediaPipe GenAI** — runs `.task` bundles (Qwen2.5, TinyLlama).
+  - **llama.cpp** — runs `.gguf` models via a bundled native (NDK) backend, which
+    opens the entire ungated GGUF ecosystem on Hugging Face. The GGUF path uses a
+    **GBNF grammar** to force valid OverlaySpec JSON (uppercase title, locked
+    style enums, `#RRGGBB` colours) and a **keep-warm** model cache so only the
+    first suggestion per session pays the load cost.
+- **Multiple models side-by-side** — download several (`.task` or `.gguf`), switch
+  the active one instantly (no re-download). One-tap **"Download all"**, per-model
+  download progress with **SHA-256 verification**, a custom model URL, or import a
+  model file you already have (the format is auto-detected from its magic bytes).
 - Works without any model too: a deterministic offline **template** generator
   picks a sensible title style from keywords.
 
@@ -88,7 +99,8 @@ leaves the device, there's no account, no subscription, and no rate limit.
 
 | Purpose | Engine | Model | Size | When |
 |---|---|---|---|---|
-| Title suggestion | MediaPipe GenAI | Qwen2.5-1.5B/3B, Gemma3-1B, Llama-3.2-1B/3B (`.task`) | ~1–3.4 GB | Downloaded on demand from the in-app picker |
+| Title suggestion (`.task`) | MediaPipe GenAI | Qwen2.5-1.5B-Instruct (default), Qwen2.5-0.5B-Instruct, TinyLlama-1.1B-Chat (`.task`, q8) | ~0.55–1.6 GB | Downloaded on demand from the in-app picker |
+| Title suggestion (`.gguf`) | llama.cpp (NDK) | Qwen2.5-1.5B-Instruct, Qwen2.5-0.5B-Instruct (`.gguf`, q4_k_m) | ~0.47–1.1 GB | Downloaded on demand; any ungated HF GGUF via custom URL |
 | Speech-to-text | Vosk | `vosk-model-small-en-us-0.15` | ~40 MB | Downloaded on first "Title from video" |
 | Background removal | MediaPipe Vision | `selfie_segmenter.tflite` | ~250 KB | **Bundled in the APK** |
 | Face framing | MediaPipe Vision | `blaze_face_short_range.tflite` | ~230 KB | **Bundled in the APK** |
@@ -96,18 +108,102 @@ leaves the device, there's no account, no subscription, and no rate limit.
 The two small vision models ship inside the app, so cut-out and face-framing work
 offline out of the box. The LLM and speech models are downloaded into the app's
 private storage (never to shared storage, never to this repo) and reused offline
-afterwards. All listed models are ungated and require no login.
+afterwards.
+
+**All five suggested LLMs are ungated** (three `.task`, two `.gguf`) and download
+with no Hugging Face login. Each download is checked against a known **SHA-256**
+digest and rejected on mismatch. Gated models such as **Gemma 3** and
+**Llama 3.2** (which require accepting a license) are intentionally left off the
+list — you can still use them by pasting their `.task`/`.gguf` URL in the **custom
+URL** field, or by importing a file you downloaded on a logged-in machine. The
+model only writes the title text; the renderer does the visual work, so a 0.5–1.5B
+instruct model is plenty.
+
+---
+
+## Compatibility
+
+### Android versions
+
+| Android | API | Status |
+|---|---|---|
+| 10 (Q) | 29 | ✅ Minimum supported (`minSdk 29`) |
+| 11 (R) | 30 | ✅ Supported |
+| 12 / 12L | 31–32 | ✅ Supported |
+| 13 (Tiramisu) | 33 | ✅ Supported · confirmed device |
+| 14 (Upside Down Cake) | 34 | ✅ Supported |
+| 15 (Vanilla Ice Cream) | 35 | ✅ Built & targeted (`compileSdk`/`targetSdk 35`) |
+| 9 (Pie) and older | ≤28 | ❌ Not supported (below `minSdk`) |
+
+Android 10 (API 29) is the floor because of the photo/video document picker (SAF)
+and scoped-storage export paths the app relies on. MediaPipe GenAI itself runs on
+API 24+, but the rest of the app assumes 29+.
+
+### CPU architecture
+
+| ABI | Release APK | Debug APK | Notes |
+|---|---|---|---|
+| `arm64-v8a` (64-bit ARM) | ✅ | ✅ | The only target for releases — virtually all phones/tablets from ~2017 on |
+| `x86_64` | ❌ | ✅ | Debug builds add it for the Android emulator. **Background removal and Auto-frame face do not work on x86_64** — MediaPipe Vision ships no x86_64 native library. The LLM and Vosk paths do work on x86_64. |
+| `armeabi-v7a` (32-bit ARM) | ❌ | ❌ | Not built. The MediaPipe GenAI runtime is 64-bit only. |
+| `x86` (32-bit) | ❌ | ❌ | Not built. |
+
+> **Use a 64-bit ARM device for the full feature set.** The x86_64 debug variant
+> exists only so the app can be exercised on an emulator, where the two camera-AI
+> features are unavailable by design.
+
+### Memory & performance guidance
+
+The on-device LLM is the only heavy feature. Everything else (rendering, export,
+contrast, presets, the 5-band audio engine, background removal, face framing) is
+light and runs comfortably on any supported device.
+
+| Device RAM | LLM suggestion |
+|---|---|
+| < 4 GB | Use the **offline template** generator (no LLM). LLM may fail to load. |
+| 4–6 GB | Qwen2.5-**0.5B** (≈0.55 GB) — fast, low memory. |
+| 6–8 GB | Qwen2.5-**1.5B** (default) or TinyLlama-1.1B. |
+| 8 GB+ | Any of the above; larger custom models possible. |
+
+LLM speed scales with the SoC. On a flagship-class chip (e.g. Snapdragon 865+ /
+recent Dimensity / Tensor) a title generates in a few seconds; on older or
+mid-range chips it takes longer but still works. There is no minimum — slow just
+means slow, and the template path is always instant.
+
+### Tested
+
+- **Samsung Galaxy Tab S7+** (Snapdragon 865+, 8 GB, One UI on Android up to 13) —
+  primary test device, all features confirmed.
+- **Android emulator** (API 29, x86_64) — used for CI-style verification of
+  rendering, export, LLM title generation and Vosk speech-to-text. (Vision features
+  are arm-only and verified on hardware instead.)
+
+Any 64-bit ARM phone or tablet on Android 10+ with ≥4 GB RAM should run the full
+app; ≥6 GB is recommended if you want to use the on-device LLM.
 
 ---
 
 ## Build
 
 Requirements: JDK 17, the Android SDK, and a `local.properties` with `sdk.dir`
-pointing at it (or an `ANDROID_HOME` env var). The Gradle wrapper pins Gradle 8.9,
-so no global Gradle install is needed.
+pointing at it (or an `ANDROID_HOME` env var). The Gradle wrapper pins Gradle
+9.6.0, so no global Gradle install is needed. The GGUF backend is built with the
+NDK, so the SDK must have **NDK `26.3.11579264`** and **CMake `3.22.1`** installed:
 
 ```bash
-# Debug APK
+sdkmanager "ndk;26.3.11579264" "cmake;3.22.1"
+```
+
+The native `llama.cpp` source is **not vendored** in this repo (it is
+`.gitignore`d). Fetch it once before the first build — the script clones a pinned
+llama.cpp commit and strips its `.git`:
+
+```bash
+bash app/src/main/cpp/fetch-llama.sh
+```
+
+```bash
+# Debug APK (also runnable on an x86_64 emulator)
 ./gradlew assembleDebug
 # -> app/build/outputs/apk/debug/app-debug.apk
 
@@ -120,7 +216,8 @@ so no global Gradle install is needed.
 ```
 
 The release build is unsigned unless those properties (or the matching `RELEASE_*`
-environment variables) are supplied. No keystore or password is stored in the repo.
+environment variables) are supplied. **No keystore or password is stored in the
+repo.**
 
 Install on a device:
 
@@ -128,40 +225,17 @@ Install on a device:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-> The app targets **arm64-v8a only** to keep the APK small. Use a 64-bit ARM device
-> or emulator image.
-
 ---
 
-## Usage manual
+## Usage
 
-### Make a thumbnail
-1. **Open** the app → **Thumbnail Maker**.
-2. **Pick photo** — choose any image; HEIC and very large sensor photos are handled.
-3. *(Optional)* **Photo (on-device AI)** row:
-   - **Cut out · dark / · blur** — replace the background.
-   - **Auto-frame face** — recrop around the subject.
-   - **Restore photo** — undo the above.
-4. **Describe it** in a sentence, then:
-   - **Suggest (AI)** — uses the active on-device model (download one first via the
-     **Model** button, top-right), or
-   - **Template** — instant offline styling, or
-   - **🎙 Title from video** — pick a clip and let the app transcribe the speech.
-5. **Tweak**: edit the title text, drag/rotate it on the preview, pick an **effect**,
-   colours and **position**, add **stickers**, apply a **preset** or your **brand
-   kit**. Watch the **contrast** hint and tap **Fix** if it's low.
-6. **Export 1280×720 PNG**, or **Export 3 A/B variants** to test styles.
+A full walkthrough — every button, both tools, model management and
+troubleshooting — is in **[MANUAL.md](MANUAL.md)**. The short version:
 
-### Manage models
-- Tap **Model** (top-right). Each suggested model shows whether it's installed and
-  which one is **active**. Tap to download (with a progress bar) or to switch the
-  active model. **Download all** grabs every model in sequence. You can also paste a
-  custom `.task` URL or import a local `.task` file.
-
-### Normalize a video's audio
-1. Open the app → **Video Normalizer**.
-2. Pick a video, choose/adjust a preset, preview, then process. The output keeps the
-   original video and writes a loudness-normalized audio track.
+1. **Thumbnail Maker** → **Pick photo** → *(optional)* cut out / auto-frame →
+   **Describe it** → **Suggest (AI)** / **Template** / **🎙 Title from video** →
+   tweak text, effect, stickers, position → **Export 1280×720 PNG**.
+2. **Video Normalizer** → pick a video → choose a preset → preview → process.
 
 ---
 
@@ -179,10 +253,15 @@ app/src/main/java/eu/cisodiagonal/youforge/
 │  ├─ Variants.kt             # A/B style variants (pure Kotlin)
 │  ├─ Presets.kt              # named style presets (pure Kotlin)
 │  ├─ TemplateProvider.kt     # offline title generator
-│  ├─ AiProvider.kt / OnDeviceLlm.kt  # on-device LLM (MediaPipe GenAI)
-│  ├─ ModelManager.kt         # multi-model store + active pointer + downloads
-│  ├─ Settings.kt             # prefs, suggested models, brand kit
+│  ├─ AiProvider.kt / OnDeviceLlm.kt  # on-device LLM (MediaPipe GenAI, .task)
+│  ├─ LlamaBridge.kt / LlamaCppEngine.kt  # on-device LLM (llama.cpp, .gguf)
+│  ├─ ModelManager.kt         # multi-model store (.task + .gguf), SHA-256, downloads
+│  ├─ Settings.kt             # prefs, suggested models (ModelFormat), brand kit
 │  └─ VisionTools.kt          # background removal + face detect (MediaPipe Vision)
+├─ cpp/                       # native GGUF backend (NDK / CMake)
+│  ├─ CMakeLists.txt          # builds llama.cpp + the JNI lib
+│  ├─ llama-android.cpp       # JNI: keep-warm load + GBNF-constrained decode
+│  └─ fetch-llama.sh          # clones the pinned llama.cpp source (gitignored)
 ├─ asr/                       # on-device speech-to-text
 │  ├─ VoskModelManager.kt     # download + unpack the speech model
 │  ├─ AudioPcmDecoder.kt      # video → 16 kHz mono PCM (MediaCodec)
@@ -194,18 +273,19 @@ app/src/main/assets/          # bundled vision models (*.tflite)
 ```
 
 A deliberate design choice: the non-AI logic (contrast, variants, presets, the
-overlay/title math) is written in **plain Kotlin with no Android imports**, so it can
-be reused directly by the planned desktop builds.
+overlay/title math, the DSP) is written in **plain Kotlin with no Android imports**,
+so it can be reused directly by the planned desktop builds.
 
 ---
 
 ## Tech stack
 
-- **Kotlin**, **Jetpack Compose**, **Material 3**
-- **MediaPipe Tasks** — GenAI (LLM), Vision (image segmenter + face detector)
+- **Kotlin 2.4**, **Jetpack Compose** (compose compiler plugin), **Material 3**
+- **MediaPipe Tasks** — GenAI (`.task` LLM), Vision (image segmenter + face detector)
+- **llama.cpp** via the **NDK** (CMake) — `.gguf` LLM with a GBNF JSON grammar
 - **Vosk** (`vosk-android`) — offline speech recognition
 - Android **MediaCodec / MediaExtractor / MediaMuxer** for audio/video
-- `minSdk 29`, `compileSdk 35`, Java 17, arm64-v8a
+- Gradle **9.6.0**, `minSdk 29`, `compileSdk 35`, Java 17, `arm64-v8a`
 
 ---
 
@@ -223,11 +303,26 @@ be reused directly by the planned desktop builds.
 YouForge makes no analytics calls and has no backend. The only outbound network
 requests are HTTPS downloads of the on-device model files (from Hugging Face and the
 Vosk model host) when you choose to install them. Your photos, videos and titles are
-processed entirely on the device.
+processed entirely on the device and never leave it.
+
+Cleartext (plain-HTTP) traffic is **disabled** at the platform level
+(`usesCleartextTraffic=false` + a network security config), model downloads are
+**SHA-256 verified**, archive extraction is guarded against Zip-Slip, and release
+builds are **R8-minified/shrunk**. `allowBackup` is off so model files and prefs are
+not swept into cloud backups.
 
 ---
 
 ## License
 
-TODO: add a license (e.g. Apache-2.0 or MIT). The bundled MediaPipe models and the
-Vosk speech model are distributed under their own permissive licenses.
+Licensed under the **Apache License 2.0** — see [LICENSE](LICENSE).
+
+Third-party components keep their own licenses:
+
+- **MediaPipe** (Apache-2.0) and the bundled `selfie_segmenter` /
+  `blaze_face_short_range` models (Google, permissive model-card terms).
+- **Vosk** (`vosk-android`, Apache-2.0) and `vosk-model-small-en-us-0.15`
+  (Apache-2.0).
+- The LLM `.task` models you download keep the license of their respective
+  repositories (e.g. Qwen — Apache-2.0; TinyLlama — Apache-2.0). YouForge does not
+  redistribute them; it downloads them from their original hosts on request.
