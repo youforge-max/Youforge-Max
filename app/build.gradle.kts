@@ -84,6 +84,6 @@ dependencies {
     implementation("com.google.mediapipe:tasks-vision:0.10.14")
     // On-device speech-to-text (Vosk) for "title from video" — small model
     // downloaded on first use, then fully offline.
-    implementation("com.alphacephei:vosk-android:0.3.47")
+    implementation("com.alphacephei:vosk-android:0.3.75")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
