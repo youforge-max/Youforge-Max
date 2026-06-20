@@ -45,8 +45,17 @@ class Settings(context: Context) {
     }
 }
 
+/** On-device model file format → which inference engine runs it. */
+enum class ModelFormat(val ext: String) {
+    /** MediaPipe GenAI LlmInference bundle. */
+    TASK("task"),
+    /** llama.cpp GGUF (via the native LlamaBridge). */
+    GGUF("gguf")
+}
+
 /**
- * A downloadable on-device model. [url] is an ungated MediaPipe `.task` unless noted.
+ * A downloadable on-device model. [url] is an ungated model file unless noted.
+ * [format] picks the engine (MediaPipe `.task` vs llama.cpp `.gguf`).
  * [sha256] is the expected lower-case hex digest of the file (HF LFS oid); when set
  * the download is rejected on mismatch. Null (e.g. custom URLs) = skip verification.
  */
@@ -57,7 +66,8 @@ data class SuggestedModel(
     val note: String,
     val url: String,
     val gated: Boolean = false,
-    val sha256: String? = null
+    val sha256: String? = null,
+    val format: ModelFormat = ModelFormat.TASK
 )
 
 /**
@@ -98,6 +108,26 @@ object SuggestedModels {
         // NB: DeepSeek-R1-Distill is intentionally omitted — it is a reasoning
         // model that emits <think>…</think> spans, which derails the short-title
         // JSON the renderer expects. Instruct models only here.
+        ,
+        // --- GGUF models (llama.cpp backend) — ungated Qwen official GGUF repos.
+        // Smaller q4_k_m files than the .task q8 above; opens the wider GGUF
+        // ecosystem (any ungated HF GGUF works via the custom-URL field too).
+        SuggestedModel(
+            "gguf-qwen2_5-0_5b", "Qwen2.5-0.5B-Instruct (GGUF)", "~0.47 GB",
+            "GGUF · tiny · fastest · no login",
+            "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/" +
+                "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+            sha256 = "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+            format = ModelFormat.GGUF
+        ),
+        SuggestedModel(
+            "gguf-qwen2_5-1_5b", "Qwen2.5-1.5B-Instruct (GGUF)", "~1.1 GB",
+            "GGUF · balanced · no login",
+            "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/" +
+                "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+            sha256 = "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+            format = ModelFormat.GGUF
+        )
     )
 
     fun bySlug(slug: String): SuggestedModel? = all.firstOrNull { it.slug == slug }

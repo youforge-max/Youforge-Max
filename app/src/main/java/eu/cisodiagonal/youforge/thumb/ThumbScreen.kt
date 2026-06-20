@@ -123,7 +123,11 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
                 val active = modelMgr.activeFile()
                 val sp0 = if (useAi && active != null) {
                     status = "AI thinking (on-device)…"
-                    OnDeviceLlm(context, active).suggest(description)
+                    val engine: AiProvider = when (modelMgr.formatOfFile(active)) {
+                        ModelFormat.GGUF -> LlamaCppEngine(active)
+                        else -> OnDeviceLlm(context, active)
+                    }
+                    engine.suggest(description)
                 } else {
                     if (useAi) status = "No model yet — used offline template."
                     TemplateProvider.suggest(description)
@@ -738,11 +742,14 @@ private fun ModelDialog(
         mutableStateOf(if (modelMgr.isPresent()) "Model ready (offline)." else "No model yet — tap one below.")
     }
 
-    fun startDownload(slug: String, name: String, dlUrl: String, sha256: String? = null) {
+    fun startDownload(
+        slug: String, name: String, dlUrl: String,
+        sha256: String? = null, format: ModelFormat = ModelFormat.TASK
+    ) {
         if (busy) return
         busy = true; curSlug = slug; progress = 0f; msg = "Downloading $name…"
         scope.launch {
-            val res = modelMgr.download(slug, dlUrl, sha256) { p -> progress = p }
+            val res = modelMgr.download(slug, dlUrl, sha256, format) { p -> progress = p }
             busy = false; progress = null; curSlug = ""; refresh++
             msg = if (res.isSuccess) "Installed $name — now active."
             else "Failed: ${res.exceptionOrNull()?.message}"
@@ -809,7 +816,7 @@ private fun ModelDialog(
                             if (installed) {
                                 modelMgr.setActive(m.slug); refresh++
                                 msg = "Using ${m.name}."; onReadyChange(true)
-                            } else startDownload(m.slug, m.name, m.url, m.sha256)
+                            } else startDownload(m.slug, m.name, m.url, m.sha256, m.format)
                         },
                         enabled = !busy || downloading,
                         modifier = Modifier.fillMaxWidth(),
@@ -871,7 +878,11 @@ private fun ModelDialog(
                     onClick = {
                         settings.modelUrl = url
                         if (url.isBlank()) { msg = "Enter a URL first." }
-                        else startDownload("custom", "custom model", url)
+                        else {
+                            val fmt = if (url.substringBefore('?').endsWith(".gguf", true))
+                                ModelFormat.GGUF else ModelFormat.TASK
+                            startDownload("custom", "custom model", url, null, fmt)
+                        }
                     },
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth()

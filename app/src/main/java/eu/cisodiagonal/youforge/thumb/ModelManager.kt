@@ -25,9 +25,19 @@ class ModelManager(context: Context) {
         const val IMPORTED_SLUG = "imported"
     }
 
-    private fun fileFor(slug: String) = File(modelsDir, "$slug.task")
+    private fun fileFor(slug: String, format: ModelFormat) = File(modelsDir, "$slug.${format.ext}")
 
-    fun isPresent(slug: String): Boolean = fileFor(slug).let { it.exists() && it.length() > MIN_BYTES }
+    /** The installed file for [slug] in whichever format is on disk, or null. */
+    private fun installedFileFor(slug: String): File? =
+        ModelFormat.values()
+            .map { File(modelsDir, "$slug.${it.ext}") }
+            .firstOrNull { it.exists() && it.length() > MIN_BYTES }
+
+    /** Format of an on-disk model file, inferred from its extension (defaults TASK). */
+    fun formatOfFile(file: File): ModelFormat =
+        ModelFormat.values().firstOrNull { file.name.endsWith(".${it.ext}") } ?: ModelFormat.TASK
+
+    fun isPresent(slug: String): Boolean = installedFileFor(slug) != null
 
     /** Slugs of all installed models (suggested + imported), plus legacy if present. */
     fun installedSlugs(): List<String> {
@@ -43,29 +53,35 @@ class ModelManager(context: Context) {
 
     /** The model file used for inference, or null if none installed. */
     fun activeFile(): File? {
-        activeSlug?.let { if (isPresent(it)) return fileFor(it) }
-        installedSlugs().firstOrNull()?.let { activeSlug = it; return fileFor(it) }
+        activeSlug?.let { installedFileFor(it)?.let { f -> return f } }
+        installedSlugs().firstOrNull()?.let { activeSlug = it; return installedFileFor(it) }
         if (legacy.exists() && legacy.length() > MIN_BYTES) return legacy
         return null
     }
 
+    /** Format of the active model (drives which engine runs it). Null if none. */
+    fun activeFormat(): ModelFormat? = activeFile()?.let { formatOfFile(it) }
+
     /** Any usable model installed? */
     fun isPresent(): Boolean = activeFile() != null
 
+    private fun closeEngines() { OnDeviceLlm.close(); LlamaCppEngine.close() }
+
     fun setActive(slug: String): Boolean {
         if (!isPresent(slug)) return false
-        if (activeSlug != slug) { OnDeviceLlm.close(); activeSlug = slug }
+        if (activeSlug != slug) { closeEngines(); activeSlug = slug }
         return true
     }
 
     fun delete(slug: String): Boolean {
-        if (activeSlug == slug) { OnDeviceLlm.close(); activeSlug = null }
-        return fileFor(slug).delete()
+        if (activeSlug == slug) { closeEngines(); activeSlug = null }
+        // Remove whichever format(s) are on disk for this slug.
+        return ModelFormat.values().map { File(modelsDir, "$slug.${it.ext}").delete() }.any { it }
     }
 
     /** Delete every installed model (and legacy). */
     fun deleteAll() {
-        OnDeviceLlm.close()
+        closeEngines()
         activeSlug = null
         modelsDir.listFiles()?.forEach { it.delete() }
         legacy.delete()
@@ -81,10 +97,11 @@ class ModelManager(context: Context) {
         slug: String,
         url: String,
         expectedSha256: String? = null,
+        format: ModelFormat = ModelFormat.TASK,
         onProgress: (Float) -> Unit
     ): Result<Unit> =
         withContext(Dispatchers.IO) {
-            val dest = fileFor(slug)
+            val dest = fileFor(slug, format)
             val tmp = File(modelsDir, "$slug.part")
             try {
                 val conn = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -136,6 +153,9 @@ class ModelManager(context: Context) {
                     tmp.delete()
                     return@withContext Result.failure(Exception("Could not move model into place"))
                 }
+                // Drop any other-format file for this slug so the active format is unambiguous.
+                ModelFormat.values().filter { it != format }
+                    .forEach { File(modelsDir, "$slug.${it.ext}").delete() }
                 setActive(slug)
                 onProgress(1f)
                 Result.success(Unit)
@@ -158,7 +178,7 @@ class ModelManager(context: Context) {
         var ok = 0
         todo.forEachIndexed { i, m ->
             onModel(m.name, i + 1, todo.size, 0f)
-            val res = download(m.slug, m.url, m.sha256) { p -> onModel(m.name, i + 1, todo.size, p) }
+            val res = download(m.slug, m.url, m.sha256, m.format) { p -> onModel(m.name, i + 1, todo.size, p) }
             if (res.isSuccess) ok++
         }
         Result.success(ok)
@@ -170,7 +190,6 @@ class ModelManager(context: Context) {
      */
     suspend fun importFromFile(uri: android.net.Uri): Result<Unit> =
         withContext(Dispatchers.IO) {
-            val dest = fileFor(IMPORTED_SLUG)
             val tmp = File(modelsDir, "$IMPORTED_SLUG.part")
             try {
                 tmp.delete()
@@ -181,7 +200,11 @@ class ModelManager(context: Context) {
                     tmp.delete()
                     return@withContext Result.failure(Exception("File too small to be a model"))
                 }
-                dest.delete()
+                // Sniff the format from the file's magic: "GGUF" => GGUF, else .task (a zip).
+                val format = if (sniffIsGguf(tmp)) ModelFormat.GGUF else ModelFormat.TASK
+                val dest = fileFor(IMPORTED_SLUG, format)
+                // Clear any previous imported file of either format.
+                ModelFormat.values().forEach { File(modelsDir, "$IMPORTED_SLUG.${it.ext}").delete() }
                 if (!tmp.renameTo(dest)) {
                     tmp.delete()
                     return@withContext Result.failure(Exception("Could not move model into place"))
@@ -193,4 +216,11 @@ class ModelManager(context: Context) {
                 Result.failure(e)
             }
         }
+
+    /** GGUF files begin with the ASCII magic "GGUF". */
+    private fun sniffIsGguf(file: File): Boolean = try {
+        val b = ByteArray(4)
+        file.inputStream().use { it.read(b) == 4 } &&
+            b.contentEquals(byteArrayOf(0x47, 0x47, 0x55, 0x46))
+    } catch (_: Exception) { false }
 }
