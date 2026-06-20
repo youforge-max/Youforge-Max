@@ -11,8 +11,8 @@ android {
         applicationId = "eu.cisodiagonal.youforge"
         minSdk = 29              // MediaPipe GenAI runs on 24+; SAF + Compose fine on 29
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.0-r10"
+        versionCode = 11
+        versionName = "1.0-r11"
 
         // Tablet is arm64; drop the other ABIs' native libs to slim the APK.
         ndk { abiFilters += "arm64-v8a" }
@@ -72,5 +72,8 @@ dependencies {
     // On-device vision: selfie segmentation (background removal) + face detection
     // (auto-crop). Models bundled in assets — fully offline, no cloud.
     implementation("com.google.mediapipe:tasks-vision:0.10.14")
+    // On-device speech-to-text (Vosk) for "title from video" — small model
+    // downloaded on first use, then fully offline.
+    implementation("com.alphacephei:vosk-android:0.3.47")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

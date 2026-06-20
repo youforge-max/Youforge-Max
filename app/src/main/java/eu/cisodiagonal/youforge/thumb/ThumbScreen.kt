@@ -38,6 +38,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import androidx.lifecycle.lifecycleScope
+import eu.cisodiagonal.youforge.asr.AudioPcmDecoder
+import eu.cisodiagonal.youforge.asr.AudioTranscriber
+import eu.cisodiagonal.youforge.asr.VoskModelManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -56,7 +59,7 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
     var spec by remember { mutableStateOf<OverlaySpec?>(null) }
     var description by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("build r10 · Pick a photo to start.") }
+    var status by remember { mutableStateOf("build r11 · Pick a photo to start.") }
     var showSettings by remember { mutableStateOf(false) }
     var modelReady by remember { mutableStateOf(modelMgr.isPresent()) }
     var stickers by remember { mutableStateOf<List<Sticker>>(emptyList()) }
@@ -109,15 +112,18 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
         }
     }
 
+    val voskMgr = remember { VoskModelManager(context) }
+
     fun generate(useAi: Boolean) {
         if (sourceBitmap == null) { status = "Pick a photo first."; return }
         if (description.isBlank()) { status = "Type a description first."; return }
         scope.launch {
             busy = true
             try {
-                val sp0 = if (useAi && modelMgr.isPresent()) {
+                val active = modelMgr.activeFile()
+                val sp0 = if (useAi && active != null) {
                     status = "AI thinking (on-device)…"
-                    OnDeviceLlm(context, modelMgr.modelFile).suggest(description)
+                    OnDeviceLlm(context, active).suggest(description)
                 } else {
                     if (useAi) status = "No model yet — used offline template."
                     TemplateProvider.suggest(description)
@@ -133,6 +139,47 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
             } finally {
                 busy = false
             }
+        }
+    }
+
+    // Title-from-video: pick a clip, transcribe its speech on-device (Vosk), then
+    // hand the transcript to the title generator. Fully offline after the one-time
+    // speech-model download.
+    val videoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            busy = true
+            var proceed: Boolean
+            try {
+                if (!voskMgr.isReady()) {
+                    status = "Downloading speech model (~40 MB, once)…"
+                    val r = voskMgr.ensure { p ->
+                        status = if (p < 0) "Downloading speech model…"
+                        else "Downloading speech model… ${(p * 100).toInt()}%"
+                    }
+                    if (r.isFailure) {
+                        status = "Speech model failed: ${r.exceptionOrNull()?.message}"; return@launch
+                    }
+                }
+                status = "Listening to the video…"
+                val pcm = withContext(Dispatchers.Default) {
+                    AudioPcmDecoder.decodeTo16kMono(context, uri)
+                }
+                if (pcm.isEmpty()) { status = "No audio found in that video."; return@launch }
+                val dir = voskMgr.modelDir()?.absolutePath
+                    ?: run { status = "Speech model missing."; return@launch }
+                status = "Transcribing on device…"
+                val text = withContext(Dispatchers.Default) { AudioTranscriber.transcribe(dir, pcm) }
+                if (text.isBlank()) { status = "Couldn't make out any speech."; return@launch }
+                description = text.take(400)
+                status = "Heard: \"${text.take(80)}…\" — generating a title."
+                proceed = true
+            } finally {
+                busy = false
+            }
+            if (proceed) generate(true)
         }
     }
 
@@ -268,6 +315,17 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
                     modifier = Modifier.weight(1f)
                 ) { Text("Template") }
             }
+
+            // Generate a title from a video's speech (on-device transcription).
+            OutlinedButton(
+                onClick = {
+                    videoPicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                    )
+                },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("🎙  Title from video (on-device)") }
 
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             Text(status, style = MaterialTheme.typography.bodySmall)
@@ -672,107 +730,157 @@ private fun ModelDialog(
     val context = LocalContext.current
     val scope = (context as ComponentActivity).lifecycleScope
     var url by remember { mutableStateOf(settings.modelUrl) }
+    var busy by remember { mutableStateOf(false) }       // a download/import is running
+    var curSlug by remember { mutableStateOf("") }       // which row is downloading
     var progress by remember { mutableStateOf<Float?>(null) }
+    var refresh by remember { mutableStateOf(0) }        // bump to recompute installed/active
     var msg by remember {
-        mutableStateOf(if (modelMgr.isPresent()) "Model installed (offline ready)." else "No model yet.")
+        mutableStateOf(if (modelMgr.isPresent()) "Model ready (offline)." else "No model yet — tap one below.")
+    }
+
+    fun startDownload(slug: String, name: String, dlUrl: String) {
+        if (busy) return
+        busy = true; curSlug = slug; progress = 0f; msg = "Downloading $name…"
+        scope.launch {
+            val res = modelMgr.download(slug, dlUrl) { p -> progress = p }
+            busy = false; progress = null; curSlug = ""; refresh++
+            msg = if (res.isSuccess) "Installed $name — now active."
+            else "Failed: ${res.exceptionOrNull()?.message}"
+            onReadyChange(modelMgr.isPresent())
+        }
+    }
+
+    fun startAll() {
+        if (busy) return
+        busy = true; curSlug = "all"; progress = -1f; msg = "Downloading all…"
+        scope.launch {
+            val res = modelMgr.downloadAll { name, idx, count, p ->
+                progress = p; msg = "[$idx/$count] $name…"
+            }
+            busy = false; progress = null; curSlug = ""; refresh++
+            msg = res.fold(
+                { if (it == 0) "All already installed." else "Done — $it model(s) installed." },
+                { "Some failed: ${it.message}" }
+            )
+            onReadyChange(modelMgr.isPresent())
+        }
     }
 
     // Pick a .task already on the device (e.g. in Downloads) — no re-download.
     val filePicker = androidx.activity.compose.rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        progress = -1f
-        msg = "Importing local model…"
+        if (uri == null || busy) return@rememberLauncherForActivityResult
+        busy = true; curSlug = ModelManager.IMPORTED_SLUG; progress = -1f; msg = "Importing local model…"
         scope.launch {
             val res = modelMgr.importFromFile(uri)
-            progress = null
-            if (res.isSuccess) {
-                msg = "Model installed from file (offline ready)."
-                onReadyChange(true)
-            } else {
-                msg = "Import failed: ${res.exceptionOrNull()?.message}"
-                onReadyChange(modelMgr.isPresent())
-            }
+            busy = false; progress = null; curSlug = ""; refresh++
+            msg = if (res.isSuccess) "Imported — now active."
+            else "Import failed: ${res.exceptionOrNull()?.message}"
+            onReadyChange(modelMgr.isPresent())
         }
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!busy) onDismiss() },
         confirmButton = {
-            TextButton(onClick = {
-                settings.modelUrl = url
-                if (url.isBlank()) { msg = "Enter a model URL first."; return@TextButton }
-                progress = 0f
-                msg = "Downloading…"
-                scope.launch {
-                    val res = modelMgr.download(url) { p -> progress = p }
-                    progress = null
-                    if (res.isSuccess) {
-                        msg = "Model installed (offline ready)."
-                        onReadyChange(true)
-                    } else {
-                        msg = "Download failed: ${res.exceptionOrNull()?.message}"
-                        onReadyChange(modelMgr.isPresent())
-                    }
-                }
-            }) { Text("Download") }
+            TextButton(onClick = { startAll() }, enabled = !busy) { Text("Download all") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-        title = { Text("On-device model") },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Close") } },
+        title = { Text("On-device models") },
         text = {
             Column(
                 Modifier
-                    .heightIn(max = 460.dp)
+                    .heightIn(max = 500.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("A small instruct model (.task) runs on this tablet. Default is Qwen2.5-1.5B (no login, ~1.6 GB) — or paste any MediaPipe .task URL. Downloads once, then works offline.",
+                refresh.let { }  // subscribe: recompute rows after installs
+                Text("Small instruct models (.task) run on this tablet — tap one to download or to switch the active model. Multiple can be kept side by side. Fully offline once downloaded.",
                     style = MaterialTheme.typography.bodySmall)
-                OutlinedButton(
-                    onClick = { filePicker.launch(arrayOf("*/*")) },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Pick local .task file (no download)") }
 
-                Text("Suggested models — tap to load its URL, then Download:",
-                    style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    SuggestedModels.all.forEach { m ->
-                        val picked = url == m.url
-                        OutlinedButton(
-                            onClick = { url = m.url },
-                            modifier = Modifier.fillMaxWidth(),
-                            border = BorderStroke(
-                                if (picked) 2.dp else 1.dp,
-                                if (picked) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.outline
-                            )
-                        ) {
-                            Column(Modifier.fillMaxWidth()) {
-                                Text("${m.name}  ·  ${m.size}", fontWeight = FontWeight.SemiBold)
-                                Text(m.note, style = MaterialTheme.typography.bodySmall)
+                SuggestedModels.all.forEach { m ->
+                    val installed = modelMgr.isPresent(m.slug)
+                    val active = installed && modelMgr.activeSlug == m.slug
+                    val downloading = busy && curSlug == m.slug
+                    OutlinedButton(
+                        onClick = {
+                            if (busy) return@OutlinedButton
+                            if (installed) {
+                                modelMgr.setActive(m.slug); refresh++
+                                msg = "Using ${m.name}."; onReadyChange(true)
+                            } else startDownload(m.slug, m.name, m.url)
+                        },
+                        enabled = !busy || downloading,
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(
+                            if (active) 2.dp else 1.dp,
+                            if (active) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outline
+                        )
+                    ) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("${m.name}  ·  ${m.size}",
+                                    fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                Text(
+                                    when {
+                                        active -> "● active"
+                                        installed -> "✓ tap to use"
+                                        else -> "↓ tap to get"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (active) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.outline
+                                )
+                            }
+                            Text(m.note, style = MaterialTheme.typography.bodySmall)
+                            if (downloading) {
+                                val p = progress
+                                if (p == null || p < 0) LinearProgressIndicator(Modifier.fillMaxWidth())
+                                else LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
+                                Text(if (p == null || p < 0) "downloading…" else "${(p * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
                 }
 
+                // Global progress (download-all / import) when not tied to one row.
+                if (busy && curSlug !in SuggestedModels.all.map { it.slug }) {
+                    val p = progress
+                    if (p == null || p < 0) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    else LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
+                }
+                Text(msg, style = MaterialTheme.typography.bodySmall)
+
+                HorizontalDivider()
+                OutlinedButton(
+                    onClick = { filePicker.launch(arrayOf("*/*")) },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Pick local .task file (no download)") }
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("…or paste a model .task URL") },
+                    label = { Text("…or paste a custom .task URL") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                progress?.let { p ->
-                    if (p < 0) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    else LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
-                    Text(if (p < 0) "downloading…" else "${(p * 100).toInt()}%")
-                }
-                Text(msg, style = MaterialTheme.typography.bodySmall)
-                if (modelMgr.isPresent()) {
+                OutlinedButton(
+                    onClick = {
+                        settings.modelUrl = url
+                        if (url.isBlank()) { msg = "Enter a URL first." }
+                        else startDownload("custom", "custom model", url)
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Download custom URL") }
+
+                if (modelMgr.installedSlugs().isNotEmpty()) {
                     TextButton(onClick = {
-                        modelMgr.delete(); onReadyChange(false); msg = "Model deleted."
-                    }) { Text("Delete model") }
+                        modelMgr.deleteAll(); refresh++; onReadyChange(false); msg = "All models deleted."
+                    }, enabled = !busy) { Text("Delete all models") }
                 }
             }
         }

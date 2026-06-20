@@ -47,6 +47,7 @@ class Settings(context: Context) {
 
 /** A downloadable on-device model. [url] is an ungated MediaPipe `.task` unless noted. */
 data class SuggestedModel(
+    val slug: String,
     val name: String,
     val size: String,
     val note: String,
@@ -65,29 +66,31 @@ object SuggestedModels {
 
     val all: List<SuggestedModel> = listOf(
         SuggestedModel(
-            "Qwen2.5-1.5B-Instruct", "~1.6 GB", "Default · fast · no login",
+            "qwen2_5-1_5b", "Qwen2.5-1.5B-Instruct", "~1.6 GB", "Default · fast · no login",
             "$BASE/Qwen2.5-1.5B-Instruct/resolve/main/" +
                 "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task"
         ),
         SuggestedModel(
-            "Gemma3-1B-IT", "~1.0 GB", "Smallest · newest · suggested upgrade",
+            "gemma3-1b", "Gemma3-1B-IT", "~1.0 GB", "Smallest · newest · suggested upgrade",
             "$BASE/Gemma3-1B-IT/resolve/main/" +
                 "Gemma3-1B-IT_multi-prefill-seq_q8_ekv1280.task"
         ),
         SuggestedModel(
-            "Llama-3.2-1B-Instruct", "~1.2 GB", "Tiny · snappy",
+            "llama3_2-1b", "Llama-3.2-1B-Instruct", "~1.2 GB", "Tiny · snappy",
             "$BASE/Llama-3.2-1B-Instruct/resolve/main/" +
                 "Llama-3.2-1B-Instruct_multi-prefill-seq_q8_ekv1280.task"
         ),
         SuggestedModel(
-            "Qwen2.5-3B-Instruct", "~3.2 GB", "Smarter titles · slower",
+            "qwen2_5-3b", "Qwen2.5-3B-Instruct", "~3.2 GB", "Smarter titles · slower",
             "$BASE/Qwen2.5-3B-Instruct/resolve/main/" +
                 "Qwen2.5-3B-Instruct_multi-prefill-seq_q8_ekv1280.task"
         ),
         SuggestedModel(
-            "Llama-3.2-3B-Instruct", "~3.4 GB", "Best quality · heaviest",
+            "llama3_2-3b", "Llama-3.2-3B-Instruct", "~3.4 GB", "Best quality · heaviest",
             "$BASE/Llama-3.2-3B-Instruct/resolve/main/" +
                 "Llama-3.2-3B-Instruct_multi-prefill-seq_q8_ekv1280.task"
         )
     )
+
+    fun bySlug(slug: String): SuggestedModel? = all.firstOrNull { it.slug == slug }
 }
