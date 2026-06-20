@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  YouForge only ever makes HTTPS requests, and only to two hosts:
+    - huggingface.co        (on-device LLM .task model downloads)
+    - alphacephei.com       (Vosk speech-to-text model zip)
+  Everything else (and all cleartext) is denied. System CA trust only;
+  no pinning so HF/CDN cert rotation never bricks downloads.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

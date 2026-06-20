@@ -45,14 +45,19 @@ class Settings(context: Context) {
     }
 }
 
-/** A downloadable on-device model. [url] is an ungated MediaPipe `.task` unless noted. */
+/**
+ * A downloadable on-device model. [url] is an ungated MediaPipe `.task` unless noted.
+ * [sha256] is the expected lower-case hex digest of the file (HF LFS oid); when set
+ * the download is rejected on mismatch. Null (e.g. custom URLs) = skip verification.
+ */
 data class SuggestedModel(
     val slug: String,
     val name: String,
     val size: String,
     val note: String,
     val url: String,
-    val gated: Boolean = false
+    val gated: Boolean = false,
+    val sha256: String? = null
 )
 
 /**
@@ -75,17 +80,20 @@ object SuggestedModels {
         SuggestedModel(
             "qwen2_5-1_5b", "Qwen2.5-1.5B-Instruct", "~1.6 GB", "Default · balanced · no login",
             "$BASE/Qwen2.5-1.5B-Instruct/resolve/main/" +
-                "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task"
+                "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
+            sha256 = "8d867a7c93a6acf2892f08e0174e2f6f351ad256b7e3cfb6d6cd9c89794b42e0"
         ),
         SuggestedModel(
             "qwen2_5-0_5b", "Qwen2.5-0.5B-Instruct", "~0.55 GB", "Tiny · fastest · no login",
             "$BASE/Qwen2.5-0.5B-Instruct/resolve/main/" +
-                "Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task"
+                "Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
+            sha256 = "e608953f169aeb1bd7b9155fec2559825e08453fc209b84eda3a781ed0452fd2"
         ),
         SuggestedModel(
             "tinyllama-1_1b", "TinyLlama-1.1B-Chat", "~1.15 GB", "Small · snappy · no login",
             "$BASE/TinyLlama-1.1B-Chat-v1.0/resolve/main/" +
-                "TinyLlama-1.1B-Chat-v1.0_multi-prefill-seq_q8_ekv1280.task"
+                "TinyLlama-1.1B-Chat-v1.0_multi-prefill-seq_q8_ekv1280.task",
+            sha256 = "0f09dc7f792bb8d49b6629effaee3ed1a99e4506b082cd353471bdf391dee053"
         )
         // NB: DeepSeek-R1-Distill is intentionally omitted — it is a reasoning
         // model that emits <think>…</think> spans, which derails the short-title

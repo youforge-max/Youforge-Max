@@ -738,11 +738,11 @@ private fun ModelDialog(
         mutableStateOf(if (modelMgr.isPresent()) "Model ready (offline)." else "No model yet — tap one below.")
     }
 
-    fun startDownload(slug: String, name: String, dlUrl: String) {
+    fun startDownload(slug: String, name: String, dlUrl: String, sha256: String? = null) {
         if (busy) return
         busy = true; curSlug = slug; progress = 0f; msg = "Downloading $name…"
         scope.launch {
-            val res = modelMgr.download(slug, dlUrl) { p -> progress = p }
+            val res = modelMgr.download(slug, dlUrl, sha256) { p -> progress = p }
             busy = false; progress = null; curSlug = ""; refresh++
             msg = if (res.isSuccess) "Installed $name — now active."
             else "Failed: ${res.exceptionOrNull()?.message}"
@@ -809,7 +809,7 @@ private fun ModelDialog(
                             if (installed) {
                                 modelMgr.setActive(m.slug); refresh++
                                 msg = "Using ${m.name}."; onReadyChange(true)
-                            } else startDownload(m.slug, m.name, m.url)
+                            } else startDownload(m.slug, m.name, m.url, m.sha256)
                         },
                         enabled = !busy || downloading,
                         modifier = Modifier.fillMaxWidth(),

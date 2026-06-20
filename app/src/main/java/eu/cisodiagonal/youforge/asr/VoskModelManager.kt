@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 import java.util.zip.ZipInputStream
 
 /**
@@ -20,6 +21,8 @@ class VoskModelManager(context: Context) {
     companion object {
         // ~40 MB, Apache-2.0, no login.
         const val MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
+        // Expected SHA-256 of the zip above; mismatch = reject (MitM / tampered mirror).
+        const val MODEL_SHA256 = "30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498"
     }
 
     /** Directory passed to Vosk's Model(), or null if not installed yet. */
@@ -35,6 +38,7 @@ class VoskModelManager(context: Context) {
     /** Download + unzip the model. [onProgress] gets 0..1 (or -1 if size unknown). */
     suspend fun ensure(onProgress: (Float) -> Unit): Result<Unit> = withContext(Dispatchers.IO) {
         if (isReady()) return@withContext Result.success(Unit)
+        val zipTmp = File(appContext.filesDir, "vosk-en.part.zip")
         try {
             root.mkdirs()
             val conn = (URL(MODEL_URL).openConnection() as HttpURLConnection).apply {
@@ -45,28 +49,43 @@ class VoskModelManager(context: Context) {
                 return@withContext Result.failure(Exception("HTTP ${conn.responseCode}"))
             }
             val total = conn.contentLengthLong
-            var lastPct = -1
-            // Count *compressed* bytes read off the wire (the zip is decompressed on
-            // the fly, so counting unpacked bytes would overshoot the content length).
-            val counting = object : java.io.FilterInputStream(conn.inputStream) {
-                var read = 0L
-                override fun read(b: ByteArray, off: Int, len: Int): Int {
-                    val n = super.read(b, off, len)
-                    if (n > 0) {
-                        read += n
+            // Download the whole zip to a temp file first, hashing as we go, so the
+            // checksum can be verified *before* anything is unpacked.
+            val digest = MessageDigest.getInstance("SHA-256")
+            zipTmp.delete()
+            conn.inputStream.use { input ->
+                zipTmp.outputStream().use { os ->
+                    val buf = ByteArray(1 shl 16)
+                    var read: Int
+                    var done = 0L
+                    var lastPct = -1
+                    while (input.read(buf).also { read = it } != -1) {
+                        os.write(buf, 0, read)
+                        digest.update(buf, 0, read)
+                        done += read
                         if (total > 0) {
-                            val pct = (read * 100 / total).toInt().coerceIn(0, 100)
+                            val pct = (done * 100 / total).toInt().coerceIn(0, 100)
                             if (pct != lastPct) { lastPct = pct; onProgress(pct / 100f) }
                         } else onProgress(-1f)
                     }
-                    return n
                 }
             }
-            ZipInputStream(counting).use { zip ->
+            val got = digest.digest().joinToString("") { "%02x".format(it) }
+            if (!got.equals(MODEL_SHA256, ignoreCase = true)) {
+                zipTmp.delete()
+                return@withContext Result.failure(Exception("Checksum mismatch — model rejected"))
+            }
+            val rootCanon = root.canonicalPath + File.separator
+            ZipInputStream(zipTmp.inputStream().buffered()).use { zip ->
                 var entry = zip.nextEntry
                 val buf = ByteArray(1 shl 16)
                 while (entry != null) {
                     val out = File(root, entry.name)
+                    // Zip Slip guard: refuse entries that escape the model dir.
+                    if (!out.canonicalPath.startsWith(rootCanon)) {
+                        zipTmp.delete()
+                        return@withContext Result.failure(Exception("Unsafe zip entry: ${entry.name}"))
+                    }
                     if (entry.isDirectory) {
                         out.mkdirs()
                     } else {
@@ -80,9 +99,11 @@ class VoskModelManager(context: Context) {
                     entry = zip.nextEntry
                 }
             }
+            zipTmp.delete()
             if (isReady()) { onProgress(1f); Result.success(Unit) }
             else Result.failure(Exception("Unpack produced no model"))
         } catch (e: Exception) {
+            zipTmp.delete()
             Result.failure(e)
         }
     }

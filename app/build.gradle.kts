@@ -11,8 +11,8 @@ android {
         applicationId = "eu.cisodiagonal.youforge"
         minSdk = 29              // MediaPipe GenAI runs on 24+; SAF + Compose fine on 29
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.0-r14"
+        versionCode = 15
+        versionName = "1.0-r15"
 
         // Tablet is arm64; drop the other ABIs' native libs to slim the APK.
         ndk { abiFilters += "arm64-v8a" }
@@ -36,7 +36,12 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             if ((findProperty("RELEASE_STORE_FILE") as String?) != null ||
                 System.getenv("RELEASE_STORE_FILE") != null) {
                 signingConfig = signingConfigs.getByName("release")

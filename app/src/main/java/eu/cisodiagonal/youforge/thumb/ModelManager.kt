@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 
 /**
  * Owns the on-device LLM models. Multiple `.task` files can live side-by-side in
@@ -73,8 +74,15 @@ class ModelManager(context: Context) {
     /**
      * Download [url] into the slot for [slug]; on success it becomes active.
      * [onProgress] gets 0..1, or -1 when the server doesn't report a size.
+     * When [expectedSha256] is non-null the finished file's SHA-256 must match
+     * (lower-case hex) or the download is rejected and discarded.
      */
-    suspend fun download(slug: String, url: String, onProgress: (Float) -> Unit): Result<Unit> =
+    suspend fun download(
+        slug: String,
+        url: String,
+        expectedSha256: String? = null,
+        onProgress: (Float) -> Unit
+    ): Result<Unit> =
         withContext(Dispatchers.IO) {
             val dest = fileFor(slug)
             val tmp = File(modelsDir, "$slug.part")
@@ -89,6 +97,7 @@ class ModelManager(context: Context) {
                     return@withContext Result.failure(Exception("HTTP ${conn.responseCode}"))
                 }
                 val total = conn.contentLengthLong
+                val digest = expectedSha256?.let { MessageDigest.getInstance("SHA-256") }
                 tmp.delete()
                 conn.inputStream.use { input ->
                     tmp.outputStream().use { output ->
@@ -98,6 +107,7 @@ class ModelManager(context: Context) {
                         var lastPct = -1
                         while (input.read(buf).also { read = it } != -1) {
                             output.write(buf, 0, read)
+                            digest?.update(buf, 0, read)
                             done += read
                             if (total > 0) {
                                 val pct = (done * 100 / total).toInt()
@@ -111,6 +121,15 @@ class ModelManager(context: Context) {
                 if (tmp.length() < MIN_BYTES) {
                     tmp.delete()
                     return@withContext Result.failure(Exception("Downloaded file too small"))
+                }
+                if (digest != null) {
+                    val got = digest.digest().joinToString("") { "%02x".format(it) }
+                    if (!got.equals(expectedSha256, ignoreCase = true)) {
+                        tmp.delete()
+                        return@withContext Result.failure(
+                            Exception("Checksum mismatch — file rejected")
+                        )
+                    }
                 }
                 dest.delete()
                 if (!tmp.renameTo(dest)) {
@@ -139,7 +158,7 @@ class ModelManager(context: Context) {
         var ok = 0
         todo.forEachIndexed { i, m ->
             onModel(m.name, i + 1, todo.size, 0f)
-            val res = download(m.slug, m.url) { p -> onModel(m.name, i + 1, todo.size, p) }
+            val res = download(m.slug, m.url, m.sha256) { p -> onModel(m.name, i + 1, todo.size, p) }
             if (res.isSuccess) ok++
         }
         Result.success(ok)
