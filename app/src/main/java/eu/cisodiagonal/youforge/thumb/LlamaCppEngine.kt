@@ -6,9 +6,10 @@ import java.io.File
 
 /**
  * On-device LLM provider backed by llama.cpp (GGUF), via the native [LlamaBridge].
- * Counterpart to [OnDeviceLlm] (MediaPipe `.task`). P1: stateless — the native
- * call loads the model, generates, and frees each time. Keep-warm + a GBNF JSON
- * grammar to constrain the output land in P2.
+ * Counterpart to [OnDeviceLlm] (MediaPipe `.task`). Keep-warm: [nativeLoad] caches
+ * the model+context (idempotent per path), so repeat suggests skip the reload;
+ * [close] (called by ModelManager on model switch) frees the native handle.
+ * A GBNF grammar to constrain the JSON lands in P2b.
  */
 class LlamaCppEngine(private val modelFile: File) : AiProvider {
 
@@ -16,7 +17,10 @@ class LlamaCppEngine(private val modelFile: File) : AiProvider {
         if (!LlamaBridge.ensureLoaded()) {
             throw IllegalStateException("GGUF backend not available on this device")
         }
-        val raw = LlamaBridge.nativeGenerate(modelFile.absolutePath, Prompts.overlay(description), N_PREDICT)
+        if (!LlamaBridge.nativeLoad(modelFile.absolutePath, threadCount())) {
+            throw IllegalStateException("Could not load GGUF model")
+        }
+        val raw = LlamaBridge.nativeGenerate(Prompts.overlay(description), N_PREDICT)
         if (raw.isBlank()) throw IllegalStateException("Model returned no output")
         OverlaySpec.parse(raw)
             ?: throw IllegalStateException("Model returned no usable JSON")
@@ -26,7 +30,13 @@ class LlamaCppEngine(private val modelFile: File) : AiProvider {
         // Enough headroom for the title JSON object; titles are short.
         private const val N_PREDICT = 160
 
-        /** No cached native state yet (stateless P1); here to match the engine lifecycle. */
-        fun close() { /* no-op until keep-warm (P2) */ }
+        /** A sensible CPU thread count for inference on a mid-range tablet. */
+        private fun threadCount(): Int =
+            Runtime.getRuntime().availableProcessors().coerceIn(2, 6)
+
+        /** Free the cached native model+context (on model switch / teardown). */
+        fun close() {
+            if (LlamaBridge.ensureLoaded()) LlamaBridge.nativeFree()
+        }
     }
 }

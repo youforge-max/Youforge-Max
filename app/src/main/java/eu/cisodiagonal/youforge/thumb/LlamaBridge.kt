@@ -1,10 +1,10 @@
 package eu.cisodiagonal.youforge.thumb
 
 /**
- * JNI bridge to the vendored llama.cpp (GGUF on-device inference). P0 spike:
- * a single stateless [nativeGenerate]. Keep-warm, sampler tuning and a GBNF
- * JSON grammar follow in P1/P2. The native lib is `liblama-android.so`,
- * built from app/src/main/cpp via CMake/NDK.
+ * JNI bridge to the vendored llama.cpp (GGUF on-device inference). Keep-warm:
+ * [nativeLoad] caches the model+context (idempotent per path), [nativeGenerate]
+ * reuses them (KV memory cleared per call), [nativeFree] releases them. The
+ * native lib is `libllama-android.so`, built from app/src/main/cpp via CMake/NDK.
  */
 object LlamaBridge {
     @Volatile private var loaded = false
@@ -22,6 +22,12 @@ object LlamaBridge {
         }
     }
 
-    /** Greedy-decode [nPredict] tokens from [prompt] using the GGUF at [modelPath]. */
-    external fun nativeGenerate(modelPath: String, prompt: String, nPredict: Int): String
+    /** Load + cache the GGUF at [modelPath] (no-op if already warm for that path). */
+    external fun nativeLoad(modelPath: String, nThreads: Int): Boolean
+
+    /** Greedy-decode up to [nPredict] tokens from [prompt] using the loaded model. */
+    external fun nativeGenerate(prompt: String, nPredict: Int): String
+
+    /** Release the cached model + context. */
+    external fun nativeFree()
 }
