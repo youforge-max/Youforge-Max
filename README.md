@@ -24,6 +24,10 @@ fully offline, even in airplane mode. The app declares a single permission:
 For the step-by-step user guide, see **[MANUAL.md](MANUAL.md)**. For version
 history and device notes, see **[CHANGELOG.md](CHANGELOG.md)**.
 
+**Download:** prebuilt `arm64-v8a` release APKs are attached to each
+[GitHub Release](https://github.com/diagonalciso/YouForge/releases) (latest:
+**v1.0-r17**). Or build it yourself — see [Build](#build).
+
 ---
 
 ## Why offline?
