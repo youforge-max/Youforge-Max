@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import eu.cisodiagonal.youforge.thumb.ThumbForgeScreen
+import eu.cisodiagonal.youforge.thumb.ThumbnailScreen
 import eu.cisodiagonal.youforge.video.VideoNormalizerScreen
 
 /** Single launcher activity hosting both tools behind a home screen. */
@@ -41,7 +41,7 @@ fun YouForgeApp() {
 
     when (tool) {
         Tool.Home -> HomeScreen(onOpen = { tool = it })
-        Tool.Thumb -> ThumbForgeScreen(onBack = { tool = Tool.Home })
+        Tool.Thumb -> ThumbnailScreen(onBack = { tool = Tool.Home })
         Tool.Video -> Scaffold(
             topBar = {
                 TopAppBar(

@@ -44,7 +44,7 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ThumbForgeScreen(onBack: () -> Unit = {}) {
+fun ThumbnailScreen(onBack: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = (context as ComponentActivity).lifecycleScope
     val modelMgr = remember { ModelManager(context) }
@@ -400,7 +400,7 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
                         val bmp = rendered ?: return@Button
                         scope.launch {
                             val ok = withContext(Dispatchers.IO) { exportToGallery(context, bmp) }
-                            status = if (ok) "Saved to Pictures/ThumbForge." else "Export failed."
+                            status = if (ok) "Saved to Pictures/YouForge." else "Export failed."
                             Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
                         }
                     },
@@ -717,7 +717,7 @@ private fun exportToGallery(context: android.content.Context, bmp: Bitmap): Bool
     val values = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, name)
         put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-        put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/ThumbForge")
+        put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/YouForge")
     }
     val resolver = context.contentResolver
     val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
