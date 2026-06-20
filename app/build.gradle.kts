@@ -103,12 +103,12 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     // On-device LLM (Gemma-2 2B .task) for the smart overlay suggestions.
-    implementation("com.google.mediapipe:tasks-genai:0.10.24")
+    implementation("com.google.mediapipe:tasks-genai:0.10.35")
     // On-device vision: selfie segmentation (background removal) + face detection
     // (auto-crop). Models bundled in assets — fully offline, no cloud.
-    implementation("com.google.mediapipe:tasks-vision:0.10.14")
+    implementation("com.google.mediapipe:tasks-vision:0.10.35")
     // On-device speech-to-text (Vosk) for "title from video" — small model
     // downloaded on first use, then fully offline.
     implementation("com.alphacephei:vosk-android:0.3.75")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 }
