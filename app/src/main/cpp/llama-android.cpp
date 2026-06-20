@@ -23,6 +23,19 @@ namespace {
 
     constexpr int N_CTX = 2048;
 
+    // GBNF grammar that forces the exact OverlaySpec JSON the renderer parses:
+    // all 9 keys in order, title constrained to UPPERCASE (small models otherwise
+    // ignore the "uppercase ≤4-word" instruction), position/effect locked to the
+    // enums OverlaySpec accepts, colours to #RRGGBB. Guarantees parseable output.
+    const char *GRAMMAR = R"GBNF(
+root ::= "{" ws "\"title\":" ws "\"" [A-Z0-9 !?.,'&]{1,40} "\"" "," ws "\"subtitle\":" ws str "," ws "\"title_color\":" ws hex "," ws "\"stroke_color\":" ws hex "," ws "\"position\":" ws pos "," ws "\"mood\":" ws str "," ws "\"accent\":" ws str "," ws "\"effect\":" ws eff "," ws "\"glow_color\":" ws hex ws "}"
+str ::= "\"" [^"\\]{0,60} "\""
+hex ::= "\"#" [0-9a-fA-F]{6} "\""
+pos ::= "\"upper-left\"" | "\"upper-center\"" | "\"upper-right\"" | "\"center\"" | "\"lower-left\"" | "\"lower-center\"" | "\"lower-right\""
+eff ::= "\"shadow\"" | "\"outline\"" | "\"glow\"" | "\"neon\"" | "\"gradient\"" | "\"pop\"" | "\"plain\""
+ws ::= [ \t\n]*
+)GBNF";
+
     void freeAll() {
         if (g_smpl)  { llama_sampler_free(g_smpl); g_smpl = nullptr; }
         if (g_ctx)   { llama_free(g_ctx);          g_ctx = nullptr; }
@@ -60,6 +73,10 @@ Java_eu_cisodiagonal_youforge_thumb_LlamaBridge_nativeLoad(
     if (!g_ctx) { LOGE("ctx failed"); freeAll(); return JNI_FALSE; }
 
     g_smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    // Grammar first (constrains the logits to the JSON schema), then greedy.
+    llama_sampler *gr = llama_sampler_init_grammar(g_vocab, GRAMMAR, "root");
+    if (gr) llama_sampler_chain_add(g_smpl, gr);
+    else LOGE("grammar failed to parse — falling back to unconstrained decode");
     llama_sampler_chain_add(g_smpl, llama_sampler_init_greedy());
 
     g_path = path;
