@@ -59,7 +59,7 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
     var spec by remember { mutableStateOf<OverlaySpec?>(null) }
     var description by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("build r12 · Pick a photo to start.") }
+    var status by remember { mutableStateOf("build r13 · Pick a photo to start.") }
     var showSettings by remember { mutableStateOf(false) }
     var modelReady by remember { mutableStateOf(modelMgr.isPresent()) }
     var stickers by remember { mutableStateOf<List<Sticker>>(emptyList()) }
@@ -342,7 +342,7 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
                         busy = true; status = "$label…"
                         val res = withContext(Dispatchers.Default) { op(src) }
                         busy = false
-                        if (res == null) { status = "$label: nothing detected."; return@launch }
+                        if (res == null) { status = "$label: couldn't process (no subject/face found, or on-device AI unavailable on this device)."; return@launch }
                         sourceBitmap = res
                         rerender()
                         status = "$label done."

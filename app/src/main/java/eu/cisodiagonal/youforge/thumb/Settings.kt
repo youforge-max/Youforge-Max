@@ -58,37 +58,40 @@ data class SuggestedModel(
 /**
  * Curated LiteRT-Community `.task` models for mid-range Android devices: keep to
  * small instruct models — the renderer makes the thumbnail, the model only writes
- * the title JSON, so a 1–3B int4/q8 is plenty. URLs stay editable, so if a
- * filename ever changes the download just reports the failure (non-fatal).
+ * the title JSON, so a 0.5–1.5B q8 is plenty.
+ *
+ * Every entry below is an **ungated** repo whose `resolve/` download works with no
+ * Hugging Face login (verified 302→CDN). Gemma3 / Llama-3.2 / Qwen-3B were dropped
+ * from the list because their downloads are gated (HF returns 401 without an
+ * accepted-license token) — they can still be added via the custom-URL field or
+ * the "Pick local .task file" import after downloading them on a logged-in machine.
+ * URLs stay editable, so if a filename ever changes the download just reports the
+ * failure (non-fatal).
  */
 object SuggestedModels {
     private const val BASE = "https://huggingface.co/litert-community"
 
     val all: List<SuggestedModel> = listOf(
         SuggestedModel(
-            "qwen2_5-1_5b", "Qwen2.5-1.5B-Instruct", "~1.6 GB", "Default · fast · no login",
+            "qwen2_5-1_5b", "Qwen2.5-1.5B-Instruct", "~1.6 GB", "Default · balanced · no login",
             "$BASE/Qwen2.5-1.5B-Instruct/resolve/main/" +
                 "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task"
         ),
         SuggestedModel(
-            "gemma3-1b", "Gemma3-1B-IT", "~1.0 GB", "Smallest · newest · suggested upgrade",
-            "$BASE/Gemma3-1B-IT/resolve/main/" +
-                "Gemma3-1B-IT_multi-prefill-seq_q8_ekv1280.task"
+            "qwen2_5-0_5b", "Qwen2.5-0.5B-Instruct", "~0.55 GB", "Tiny · fastest · no login",
+            "$BASE/Qwen2.5-0.5B-Instruct/resolve/main/" +
+                "Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task"
         ),
         SuggestedModel(
-            "llama3_2-1b", "Llama-3.2-1B-Instruct", "~1.2 GB", "Tiny · snappy",
-            "$BASE/Llama-3.2-1B-Instruct/resolve/main/" +
-                "Llama-3.2-1B-Instruct_multi-prefill-seq_q8_ekv1280.task"
+            "tinyllama-1_1b", "TinyLlama-1.1B-Chat", "~1.15 GB", "Small · snappy · no login",
+            "$BASE/TinyLlama-1.1B-Chat-v1.0/resolve/main/" +
+                "TinyLlama-1.1B-Chat-v1.0_multi-prefill-seq_q8_ekv1280.task"
         ),
         SuggestedModel(
-            "qwen2_5-3b", "Qwen2.5-3B-Instruct", "~3.2 GB", "Smarter titles · slower",
-            "$BASE/Qwen2.5-3B-Instruct/resolve/main/" +
-                "Qwen2.5-3B-Instruct_multi-prefill-seq_q8_ekv1280.task"
-        ),
-        SuggestedModel(
-            "llama3_2-3b", "Llama-3.2-3B-Instruct", "~3.4 GB", "Best quality · heaviest",
-            "$BASE/Llama-3.2-3B-Instruct/resolve/main/" +
-                "Llama-3.2-3B-Instruct_multi-prefill-seq_q8_ekv1280.task"
+            "deepseek-r1-qwen-1_5b", "DeepSeek-R1-Distill-Qwen-1.5B", "~1.86 GB",
+            "Smarter · slower · no login",
+            "$BASE/DeepSeek-R1-Distill-Qwen-1.5B/resolve/main/" +
+                "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv1280.task"
         )
     )
 

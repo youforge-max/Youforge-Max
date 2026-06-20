@@ -11,8 +11,8 @@ android {
         applicationId = "eu.cisodiagonal.youforge"
         minSdk = 29              // MediaPipe GenAI runs on 24+; SAF + Compose fine on 29
         targetSdk = 35
-        versionCode = 12
-        versionName = "1.0-r12"
+        versionCode = 13
+        versionName = "1.0-r13"
 
         // Tablet is arm64; drop the other ABIs' native libs to slim the APK.
         ndk { abiFilters += "arm64-v8a" }
@@ -41,6 +41,11 @@ android {
                 System.getenv("RELEASE_STORE_FILE") != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
+        }
+        debug {
+            // Debug builds also carry x86_64 so the app runs on an x86_64 emulator
+            // under KVM (incl. the MediaPipe/Vosk native libs). Release stays arm64-only.
+            ndk { abiFilters += "x86_64" }
         }
     }
 

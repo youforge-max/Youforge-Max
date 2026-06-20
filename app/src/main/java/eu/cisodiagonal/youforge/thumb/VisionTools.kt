@@ -34,14 +34,16 @@ object VisionTools {
 
     /**
      * Cut the subject out with the selfie segmenter and recomposite over a new
-     * background. Returns the original on any failure.
+     * background. Returns null on any failure (e.g. MediaPipe vision native lib
+     * unavailable on this ABI) so the caller can surface an honest error instead
+     * of silently leaving the photo unchanged.
      */
     fun removeBackground(
         context: Context,
         source: Bitmap,
         style: BackgroundStyle = BackgroundStyle.DARK,
         color: Int = 0xFF0E0E12.toInt()
-    ): Bitmap {
+    ): Bitmap? {
         var seg: ImageSegmenter? = null
         try {
             val opts = ImageSegmenter.ImageSegmenterOptions.builder()
@@ -55,8 +57,8 @@ object VisionTools {
             val src = source.copy(Bitmap.Config.ARGB_8888, false)
             val w = src.width; val h = src.height
             val result = seg.segment(BitmapImageBuilder(src).build())
-            val masks = result.confidenceMasks().orElse(null) ?: return source
-            if (masks.isEmpty()) return source
+            val masks = result.confidenceMasks().orElse(null) ?: return null
+            if (masks.isEmpty()) return null
             val maskImg = masks[0]
             val buf = ByteBufferExtractor.extract(maskImg).order(ByteOrder.LITTLE_ENDIAN)
             val floats = buf.asFloatBuffer()
@@ -80,7 +82,7 @@ object VisionTools {
             }
             return Bitmap.createBitmap(out, w, h, Bitmap.Config.ARGB_8888)
         } catch (_: Throwable) {
-            return source
+            return null
         } finally {
             seg?.close()
         }
