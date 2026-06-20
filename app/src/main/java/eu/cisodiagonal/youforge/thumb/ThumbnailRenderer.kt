@@ -41,11 +41,34 @@ object ThumbnailRenderer {
 
         drawCenterCropped(canvas, source)
         if (spec != null) {
-            drawScrim(canvas, spec.position)
+            // Free-positioned text carries its own legibility via the effect stack;
+            // the position scrim only applies to anchored text.
+            if (spec.freeX == null || spec.freeY == null) drawScrim(canvas, spec.position)
             drawText(canvas, spec)
         }
         drawStickers(canvas, context, stickers)
         return out
+    }
+
+    /**
+     * Axis-aligned bounding box of the title block, normalised to 0..1, for hit
+     * testing in the editor. Rotation is ignored (generous box is fine for taps).
+     * Returns null when there is no title.
+     */
+    fun titleBoundsNorm(spec: OverlaySpec): RectF? {
+        if (spec.title.isBlank()) return null
+        val L = computeTitleLayout(spec)
+        val halfW = L.maxLineW / 2f
+        val cx = L.centerX
+        val cy = L.centerY
+        val padX = W * 0.02f
+        val padY = H * 0.03f
+        return RectF(
+            ((cx - halfW - padX) / W).coerceIn(0f, 1f),
+            ((cy - L.blockH / 2f - padY) / H).coerceIn(0f, 1f),
+            ((cx + halfW + padX) / W).coerceIn(0f, 1f),
+            ((cy + L.blockH / 2f + padY) / H).coerceIn(0f, 1f)
+        )
     }
 
     /**
@@ -94,6 +117,8 @@ object ThumbnailRenderer {
             val sizePx = s.scale * W
             val cx = s.cx * W
             val cy = s.cy * H
+            canvas.save()
+            if (s.rotation != 0f) canvas.rotate(s.rotation, cx, cy)
             when (val k = s.kind) {
                 is StickerKind.Vector -> {
                     val d = ContextCompat.getDrawable(context, k.resId) ?: continue
@@ -130,6 +155,7 @@ object ThumbnailRenderer {
                     canvas.drawText("SUBSCRIBE", cx, cy - (fm.ascent + fm.descent) / 2f, tp)
                 }
             }
+            canvas.restore()
         }
     }
 
@@ -165,12 +191,27 @@ object ThumbnailRenderer {
         }
     }
 
-    private fun drawText(canvas: Canvas, spec: OverlaySpec) {
+    /** Resolved geometry of the title block, in canvas pixels. */
+    private data class TitleLayout(
+        val lines: List<String>,
+        val size: Float,
+        val lineH: Float,
+        val x: Float,         // text-draw x (anchor for the Paint.Align)
+        val y0: Float,        // baseline of the first line
+        val align: Paint.Align,
+        val blockH: Float,
+        val maxLineW: Float,  // widest line, pixels
+        val centerX: Float,   // block centre (rotation pivot / hit box)
+        val centerY: Float
+    )
+
+    private fun computeTitleLayout(spec: OverlaySpec): TitleLayout {
         val title = (spec.accent.takeIf { it.isNotBlank() }?.let { "$it " } ?: "") +
             spec.title.uppercase()
+        val free = spec.freeX != null && spec.freeY != null
 
         val tf = Typeface.create("sans-serif-black", Typeface.BOLD)
-        val align = alignFor(spec.position)
+        val align = if (free) Paint.Align.CENTER else alignFor(spec.position)
         val measure = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = tf; textAlign = align }
 
         // Auto-fit: shrink until the title wraps into <= MAX_LINES within the safe width.
@@ -183,28 +224,58 @@ object ThumbnailRenderer {
             if (lines.size <= MAX_LINES || size <= 56f) break
             size -= 6f
         }
+        // Manual size multiplier (pinch-zoom). Re-measure widths at the final size.
+        size = (size * spec.titleScale).coerceIn(28f, 320f)
+        measure.textSize = size
+        val maxLineW = lines.maxOf { l ->
+            val b = Rect(); measure.getTextBounds(l, 0, l.length, b); b.width().toFloat()
+        }
 
         val lineH = size * 1.06f
         val subSize = size * 0.42f
         val hasSub = spec.subtitle.isNotBlank()
         val blockH = lines.size * lineH + if (hasSub) subSize * 1.4f else 0f
 
-        val x = anchorX(spec.position)
-        val y0 = anchorTop(spec.position, blockH) + size   // baseline of first line
+        val x: Float
+        val topY: Float
+        if (free) {
+            x = spec.freeX!! * W
+            topY = spec.freeY!! * H - blockH / 2f
+        } else {
+            x = anchorX(spec.position)
+            topY = anchorTop(spec.position, blockH)
+        }
+        val y0 = topY + size
+        val centerX = when (align) {
+            Paint.Align.CENTER -> x
+            Paint.Align.RIGHT -> x - maxLineW / 2f
+            else -> x + maxLineW / 2f
+        }
+        val centerY = topY + blockH / 2f
+        return TitleLayout(lines, size, lineH, x, y0, align, blockH, maxLineW, centerX, centerY)
+    }
 
-        drawTitleEffect(canvas, spec, lines, x, y0, lineH, size, tf, align)
+    private fun drawText(canvas: Canvas, spec: OverlaySpec) {
+        val L = computeTitleLayout(spec)
+        val tf = Typeface.create("sans-serif-black", Typeface.BOLD)
 
-        if (hasSub) {
+        canvas.save()
+        if (spec.rotation != 0f) canvas.rotate(spec.rotation, L.centerX, L.centerY)
+
+        drawTitleEffect(canvas, spec, L.lines, L.x, L.y0, L.lineH, L.size, tf, L.align)
+
+        if (spec.subtitle.isNotBlank()) {
             val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.WHITE
                 typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-                textAlign = align
-                textSize = subSize
+                textAlign = L.align
+                textSize = L.size * 0.42f
                 setShadowLayer(8f, 0f, 4f, Color.argb(180, 0, 0, 0))
             }
-            val subY = y0 + (lines.size - 1) * lineH + lineH * 0.95f
-            canvas.drawText(spec.subtitle.uppercase(), x, subY, subPaint)
+            val subY = L.y0 + (L.lines.size - 1) * L.lineH + L.lineH * 0.95f
+            canvas.drawText(spec.subtitle.uppercase(), L.x, subY, subPaint)
         }
+        canvas.restore()
     }
 
     /** Draws the title's [lines] with the layer stack for [OverlaySpec.effect]. */

@@ -19,7 +19,9 @@ data class Sticker(
     val kind: StickerKind,
     val cx: Float = 0.5f,
     val cy: Float = 0.5f,
-    val scale: Float = 0.18f
+    val scale: Float = 0.18f,
+    /** Rotation in degrees, clockwise, about the sticker centre. */
+    val rotation: Float = 0f
 )
 
 /** Palette shown in the UI. Vectors first, then a set of YouTube-y emoji. */

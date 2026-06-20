@@ -15,7 +15,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -54,11 +55,12 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
     var spec by remember { mutableStateOf<OverlaySpec?>(null) }
     var description by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("build r7 · Pick a photo to start.") }
+    var status by remember { mutableStateOf("build r8 · Pick a photo to start.") }
     var showSettings by remember { mutableStateOf(false) }
     var modelReady by remember { mutableStateOf(modelMgr.isPresent()) }
     var stickers by remember { mutableStateOf<List<Sticker>>(emptyList()) }
     var selectedId by remember { mutableStateOf<Long?>(null) }
+    var titleSelected by remember { mutableStateOf(false) }
     var previewSize by remember { mutableStateOf(IntSize.Zero) }
 
     fun rerender() {
@@ -72,13 +74,20 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
         rerender()
     }
 
+    fun updateTitle(transform: (OverlaySpec) -> OverlaySpec) {
+        val sp = spec ?: return
+        spec = transform(sp)
+        rerender()
+    }
+
     fun addSticker(kind: StickerKind) {
         if (sourceBitmap == null) { status = "Pick a photo first."; return }
         val s = Sticker(id = Stickers.nextId(), kind = kind, scale = Stickers.defaultScale(kind))
         stickers = stickers + s
         selectedId = s.id
+        titleSelected = false
         rerender()
-        status = "Sticker added — drag it on the preview, scale/delete below."
+        status = "Sticker added — drag to move, two fingers to rotate/scale."
     }
 
     val picker = rememberLauncherForPicker { uri ->
@@ -92,6 +101,7 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
             spec = null
             stickers = emptyList()
             selectedId = null
+            titleSelected = false
             rendered = ThumbnailRenderer.render(context, bmp, null, emptyList())
             status = "Describe your thumbnail, then tap Suggest."
         }
@@ -164,34 +174,60 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
                     .aspectRatio(16f / 9f, matchHeightConstraintsFirst = true)
                     .clip(RoundedCornerShape(10.dp))
                     .onSizeChanged { previewSize = it }
+                    // Tap to select the topmost element under the touch (sticker first,
+                    // then the title block); tap empty space to deselect.
+                    .pointerInput(stickers, spec) {
+                        detectTapGestures { off ->
+                            val w = previewSize.width.toFloat()
+                            val h = previewSize.height.toFloat()
+                            if (w <= 0 || h <= 0) return@detectTapGestures
+                            val nx = off.x / w
+                            val ny = off.y / h
+                            val hit = stickers.lastOrNull { s ->
+                                val halfX = s.scale / 2f
+                                val halfY = s.scale * (ThumbnailRenderer.W.toFloat() / ThumbnailRenderer.H) / 2f
+                                abs(nx - s.cx) <= halfX && abs(ny - s.cy) <= halfY
+                            }
+                            if (hit != null) {
+                                selectedId = hit.id; titleSelected = false
+                            } else {
+                                val tb = spec?.let { ThumbnailRenderer.titleBoundsNorm(it) }
+                                if (tb != null && nx in tb.left..tb.right && ny in tb.top..tb.bottom) {
+                                    titleSelected = true; selectedId = null
+                                } else {
+                                    selectedId = null; titleSelected = false
+                                }
+                            }
+                        }
+                    }
+                    // Drag = move, two fingers = rotate + scale, on the selected element.
                     .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { off ->
-                                val w = previewSize.width.toFloat()
-                                val h = previewSize.height.toFloat()
-                                if (w <= 0 || h <= 0) return@detectDragGestures
-                                val nx = off.x / w
-                                val ny = off.y / h
-                                // pick the topmost sticker whose box contains the touch
-                                selectedId = stickers.lastOrNull { s ->
-                                    val halfX = s.scale / 2f
-                                    val halfY = s.scale * (ThumbnailRenderer.W.toFloat() / ThumbnailRenderer.H) / 2f
-                                    abs(nx - s.cx) <= halfX && abs(ny - s.cy) <= halfY
-                                }?.id
-                            },
-                            onDrag = { change, delta ->
-                                change.consume()
-                                val w = previewSize.width.toFloat()
-                                val h = previewSize.height.toFloat()
-                                if (w <= 0 || h <= 0) return@detectDragGestures
+                        detectTransformGestures { _, pan, zoom, rot ->
+                            val w = previewSize.width.toFloat()
+                            val h = previewSize.height.toFloat()
+                            if (w <= 0 || h <= 0) return@detectTransformGestures
+                            if (titleSelected) {
+                                updateTitle { sp ->
+                                    val ix = sp.freeX ?: sp.position.approxCenter().first
+                                    val iy = sp.freeY ?: sp.position.approxCenter().second
+                                    sp.copy(
+                                        freeX = (ix + pan.x / w).coerceIn(0f, 1f),
+                                        freeY = (iy + pan.y / h).coerceIn(0f, 1f),
+                                        rotation = sp.rotation + rot,
+                                        titleScale = (sp.titleScale * zoom).coerceIn(0.3f, 3f)
+                                    )
+                                }
+                            } else if (selectedId != null) {
                                 updateSelected {
                                     it.copy(
-                                        cx = (it.cx + delta.x / w).coerceIn(0f, 1f),
-                                        cy = (it.cy + delta.y / h).coerceIn(0f, 1f)
+                                        cx = (it.cx + pan.x / w).coerceIn(0f, 1f),
+                                        cy = (it.cy + pan.y / h).coerceIn(0f, 1f),
+                                        scale = (it.scale * zoom).coerceIn(0.05f, 1.2f),
+                                        rotation = it.rotation + rot
                                     )
                                 }
                             }
-                        )
+                        }
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -276,24 +312,31 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
                     }
                 }
                 if (selectedId != null) {
+                    val sel = stickers.firstOrNull { it.id == selectedId }
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Selected:")
+                        Text("Sticker:")
                         OutlinedButton(onClick = {
                             updateSelected { it.copy(scale = (it.scale - 0.03f).coerceAtLeast(0.05f)) }
                         }) { Text("–") }
                         OutlinedButton(onClick = {
-                            updateSelected { it.copy(scale = (it.scale + 0.03f).coerceAtMost(0.9f)) }
+                            updateSelected { it.copy(scale = (it.scale + 0.03f).coerceAtMost(1.2f)) }
                         }) { Text("+") }
+                        OutlinedButton(onClick = {
+                            updateSelected { it.copy(rotation = 0f) }
+                        }) { Text("0°") }
                         OutlinedButton(onClick = {
                             val id = selectedId
                             stickers = stickers.filterNot { it.id == id }
                             selectedId = null
                             rerender()
                         }) { Text("Delete") }
+                    }
+                    RotationSlider(sel?.rotation ?: 0f) { r ->
+                        updateSelected { it.copy(rotation = r) }
                     }
                 }
             }
@@ -316,6 +359,30 @@ fun ThumbForgeScreen(onBack: () -> Unit = {}) {
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+                // Free move/rotate/scale of the title (also draggable on the preview).
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(if (titleSelected) "Title ✓" else "Title:")
+                    OutlinedButton(onClick = {
+                        spec = sp.copy(titleScale = (sp.titleScale - 0.1f).coerceAtLeast(0.3f)); rerender()
+                    }) { Text("–") }
+                    OutlinedButton(onClick = {
+                        spec = sp.copy(titleScale = (sp.titleScale + 0.1f).coerceAtMost(3f)); rerender()
+                    }) { Text("+") }
+                    OutlinedButton(onClick = {
+                        spec = sp.copy(rotation = 0f, titleScale = 1f, freeX = null, freeY = null)
+                        titleSelected = false; rerender()
+                    }) { Text("Reset") }
+                }
+                Text(
+                    "Tap the title on the preview to grab it — drag to move, two fingers to rotate/scale.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                RotationSlider(sp.rotation) { r -> spec = sp.copy(rotation = r); rerender() }
                 EffectStrip(sp.effect, sp.titleColor, sp.glowColor) {
                     spec = sp.copy(effect = it); rerender()
                 }
@@ -357,6 +424,24 @@ private val titleSwatches = listOf(
     0xFFFFEC3D.toInt(), 0xFFFFFFFF.toInt(), 0xFFFF3D3D.toInt(),
     0xFFB6FF3D.toInt(), 0xFF3DC6FF.toInt(), 0xFFFF8A3D.toInt()
 )
+
+/** -180°..180° rotation slider for the selected element. */
+@Composable
+private fun RotationSlider(value: Float, onChange: (Float) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("⟳ ${value.toInt()}°", style = MaterialTheme.typography.bodySmall)
+        Slider(
+            value = value.coerceIn(-180f, 180f),
+            onValueChange = onChange,
+            valueRange = -180f..180f,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
 
 @Composable
 private fun StickerGroupLabel(text: String) {
@@ -509,17 +594,45 @@ private fun ModelDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
         title = { Text("On-device model") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                Modifier
+                    .heightIn(max = 460.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text("A small instruct model (.task) runs on this tablet. Default is Qwen2.5-1.5B (no login, ~1.6 GB) — or paste any MediaPipe .task URL. Downloads once, then works offline.",
                     style = MaterialTheme.typography.bodySmall)
                 OutlinedButton(
                     onClick = { filePicker.launch(arrayOf("*/*")) },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Pick local .task file (no download)") }
+
+                Text("Suggested models — tap to load its URL, then Download:",
+                    style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    SuggestedModels.all.forEach { m ->
+                        val picked = url == m.url
+                        OutlinedButton(
+                            onClick = { url = m.url },
+                            modifier = Modifier.fillMaxWidth(),
+                            border = BorderStroke(
+                                if (picked) 2.dp else 1.dp,
+                                if (picked) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outline
+                            )
+                        ) {
+                            Column(Modifier.fillMaxWidth()) {
+                                Text("${m.name}  ·  ${m.size}", fontWeight = FontWeight.SemiBold)
+                                Text(m.note, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("…or model .task URL") },
+                    label = { Text("…or paste a model .task URL") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )

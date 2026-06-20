@@ -13,6 +13,22 @@ enum class Position(val id: String) {
     LOWER_CENTER("lower-center"),
     LOWER_RIGHT("lower-right");
 
+    /** Approx normalised centre of the title block for this anchor — used to seed
+     *  free-drag so the title doesn't jump on first touch. */
+    fun approxCenter(): Pair<Float, Float> {
+        val x = when (this) {
+            UPPER_LEFT, LOWER_LEFT -> 0.30f
+            UPPER_RIGHT, LOWER_RIGHT -> 0.70f
+            else -> 0.50f
+        }
+        val y = when (this) {
+            UPPER_LEFT, UPPER_CENTER, UPPER_RIGHT -> 0.22f
+            CENTER -> 0.50f
+            else -> 0.78f
+        }
+        return x to y
+    }
+
     companion object {
         fun from(s: String?): Position =
             entries.firstOrNull { it.id.equals(s?.trim(), ignoreCase = true) } ?: LOWER_LEFT
@@ -48,7 +64,15 @@ data class OverlaySpec(
     val mood: String = "",
     val accent: String = "",       // single emoji, optional
     val effect: TextEffect = TextEffect.GLOW,
-    val glowColor: Int = Color.parseColor("#FF2D7A")   // halo/accent for glow & neon
+    val glowColor: Int = Color.parseColor("#FF2D7A"),   // halo/accent for glow & neon
+    // --- Free transform (manual, not produced by the LLM) ---
+    /** Rotation in degrees, clockwise, about the title block centre. */
+    val rotation: Float = 0f,
+    /** Manual centre (0..1) of the title block. When non-null, overrides [position]. */
+    val freeX: Float? = null,
+    val freeY: Float? = null,
+    /** Manual size multiplier applied on top of the auto-fit size. */
+    val titleScale: Float = 1f
 ) {
     companion object {
         private fun color(hex: String?, fallback: Int): Int =
