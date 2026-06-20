@@ -45,9 +45,24 @@ class VoskModelManager(context: Context) {
                 return@withContext Result.failure(Exception("HTTP ${conn.responseCode}"))
             }
             val total = conn.contentLengthLong
-            var done = 0L
             var lastPct = -1
-            ZipInputStream(conn.inputStream).use { zip ->
+            // Count *compressed* bytes read off the wire (the zip is decompressed on
+            // the fly, so counting unpacked bytes would overshoot the content length).
+            val counting = object : java.io.FilterInputStream(conn.inputStream) {
+                var read = 0L
+                override fun read(b: ByteArray, off: Int, len: Int): Int {
+                    val n = super.read(b, off, len)
+                    if (n > 0) {
+                        read += n
+                        if (total > 0) {
+                            val pct = (read * 100 / total).toInt().coerceIn(0, 100)
+                            if (pct != lastPct) { lastPct = pct; onProgress(pct / 100f) }
+                        } else onProgress(-1f)
+                    }
+                    return n
+                }
+            }
+            ZipInputStream(counting).use { zip ->
                 var entry = zip.nextEntry
                 val buf = ByteArray(1 shl 16)
                 while (entry != null) {
@@ -58,14 +73,7 @@ class VoskModelManager(context: Context) {
                         out.parentFile?.mkdirs()
                         out.outputStream().use { os ->
                             var r: Int
-                            while (zip.read(buf).also { r = it } != -1) {
-                                os.write(buf, 0, r)
-                                done += r
-                                if (total > 0) {
-                                    val pct = (done * 100 / total).toInt()
-                                    if (pct != lastPct) { lastPct = pct; onProgress(pct / 100f) }
-                                } else onProgress(-1f)
-                            }
+                            while (zip.read(buf).also { r = it } != -1) os.write(buf, 0, r)
                         }
                     }
                     zip.closeEntry()

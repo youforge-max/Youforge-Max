@@ -56,7 +56,7 @@ data class SuggestedModel(
 )
 
 /**
- * Curated LiteRT-Community `.task` models for the Tab S7+ (SD865+/8GB): keep to
+ * Curated LiteRT-Community `.task` models for mid-range Android devices: keep to
  * small instruct models — the renderer makes the thumbnail, the model only writes
  * the title JSON, so a 1–3B int4/q8 is plenty. URLs stay editable, so if a
  * filename ever changes the download just reports the failure (non-fatal).

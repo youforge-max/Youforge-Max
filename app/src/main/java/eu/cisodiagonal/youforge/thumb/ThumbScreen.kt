@@ -59,7 +59,7 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
     var spec by remember { mutableStateOf<OverlaySpec?>(null) }
     var description by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("build r11 · Pick a photo to start.") }
+    var status by remember { mutableStateOf("build r12 · Pick a photo to start.") }
     var showSettings by remember { mutableStateOf(false) }
     var modelReady by remember { mutableStateOf(modelMgr.isPresent()) }
     var stickers by remember { mutableStateOf<List<Sticker>>(emptyList()) }
@@ -298,7 +298,7 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Describe it (e.g. moody solo wild camp, title \"VANISHED 3 DAYS\")") },
+                label = { Text("Describe it (e.g. epic mountain hike, title \"WE MADE IT\")") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2
             )
@@ -896,7 +896,7 @@ private fun rememberLauncherForPicker(onResult: (Uri?) -> Unit) =
     ) { onResult(it) }
 
 /**
- * Robust decode for any picked image. Handles Huawei/HEIC + huge sensor photos:
+ * Robust decode for any picked image. Handles odd OEM/HEIC + huge sensor photos:
  *  1) ImageDecoder, software allocator, downsample to <=2048px (avoids OOM).
  *  2) Fallback to BitmapFactory stream decode with inSampleSize.
  * Catches Throwable (incl. OutOfMemoryError). Reports the failure reason via [onError].

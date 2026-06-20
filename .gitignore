@@ -1,8 +1,39 @@
+# Android / Gradle build output
 *.iml
 .gradle/
 .idea/
 build/
-local.properties
 captures/
 .externalNativeBuild/
 .cxx/
+
+# Local config (machine-specific SDK path)
+local.properties
+
+# Signing material — never commit
+*.jks
+*.keystore
+keystore.properties
+key.properties
+signing.properties
+release.properties
+
+# Build artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Logs / temp
+*.log
+*.part
+
+# Note: app/src/main/assets/*.tflite (vision models) ARE committed on purpose —
+# they ship in the APK so the app works fully offline. Speech/LLM models are
+# downloaded at runtime into app filesDir and never live in the repo.
