@@ -4,6 +4,12 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    ignore:
+      # tasks-vision 0.20230731 uses an old date-based version scheme that sorts
+      # ABOVE the current 0.10.x semver — Dependabot mis-ranks it as an upgrade,
+      # but it is an effective downgrade. Pin to the 0.10.x line.
+      - dependency-name: "com.google.mediapipe:tasks-vision"
+        versions: [">=0.20000000"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
