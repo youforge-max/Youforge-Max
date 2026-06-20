@@ -37,3 +37,4 @@ Thumbs.db
 # Note: app/src/main/assets/*.tflite (vision models) ARE committed on purpose —
 # they ship in the APK so the app works fully offline. Speech/LLM models are
 # downloaded at runtime into app filesDir and never live in the repo.
+app/src/main/cpp/llama.cpp/
