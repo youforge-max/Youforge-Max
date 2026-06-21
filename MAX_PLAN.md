@@ -37,10 +37,14 @@ things YouForge already has: the **Compose UI** and the **overlay renderer + aud
   `thumb` overlay model/renderer (one shared overlay spec across thumbnail + video).
 - **P4:** **music track** (second audio sequence) + ducking, mastered through the
   Video Normalizer DSP; fade in/out.
-- **P5:** **filters/LUTs** + **transitions** (crossfade); export resolution/bitrate
-  picker (720p/1080p/4K).
-- **P6:** preview effects live with `ExoPlayer.setVideoEffects`; undo/redo; project
-  save/restore.
+- **P5 (DONE):** colour **filters** (B&W/Vivid/Warm/Cool/Punch via Media3
+  RgbFilter/HslAdjustment/RgbAdjustment/Contrast) at export + live preview; **4K**
+  export resolution. Transitions/crossfade still deferred (Media3 crossfade fiddly).
+- **P6 (DONE):** live filter preview (`ExoPlayer.setVideoEffects`); **undo**;
+  **project save/load** (clips+trim+mute+title+music+filter+resolution → filesDir).
+- **Fit:** all control rows use `FlowRow` (wrap) + the screen scrolls, so nothing
+  runs off-screen (verified on Tab S7+ geometry 2800×1752).
+- **Deferred:** per-clip speed (`SpeedChangeEffect`), transitions, redo.
 
 ## Notes / risks
 

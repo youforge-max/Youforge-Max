@@ -89,17 +89,22 @@ fun VideoEditorScreen() {
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
         if (uris.isNullOrEmpty()) return@rememberLauncherForActivityResult
-        val added = uris.mapNotNull { uri ->
+        // Always add every picked clip — never drop one because its duration didn't
+        // read (some containers report no duration); fall back so the clip still shows.
+        val added = uris.map { uri ->
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
                     uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             }
-            durationOf(context, uri)?.let { dur -> Clip(uri = uri, durationMs = dur) }
+            val dur = durationOf(context, uri)?.takeIf { it > 0 } ?: 60_000L
+            Clip(uri = uri, durationMs = dur)
         }
-        edit(project.copy(clips = project.clips + added))
-        if (selected < 0 && project.clips.isNotEmpty()) selected = 0
-        status = "${project.clips.size} clip(s) · ${fmt(project.totalOutMs)} total"
+        val newClips = project.clips + added
+        edit(project.copy(clips = newClips))
+        // Jump the preview to the newest clip so a just-added clip is visibly there.
+        selected = newClips.size - 1
+        status = "${newClips.size} clip(s) · ${fmt(newClips.sumOf { it.outMs })} total"
     }
 
     Column(
