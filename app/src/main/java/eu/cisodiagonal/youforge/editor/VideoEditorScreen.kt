@@ -215,6 +215,21 @@ fun VideoEditorScreen() {
                 )
                 status = "${project.clips.size} clip(s) · ${fmt(project.totalOutMs)} total"
             }
+            // Per-clip speed
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Speed:", fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterVertically))
+                listOf(0.25f, 0.5f, 1f, 1.5f, 2f).forEach { sp ->
+                    FilterChip(
+                        selected = clip.speed == sp,
+                        onClick = {
+                            edit(project.copy(clips = project.clips.toMutableList().also { it[selected] = clip.copy(speed = sp) }))
+                            status = "${project.clips.size} clip(s) · ${fmt(project.totalOutMs)} total"
+                        },
+                        label = { Text(if (sp == 1f) "1×" else "${sp}×") },
+                        enabled = !exporting
+                    )
+                }
+            }
         }
 
         // Clip list (the timeline, as a vertical list for the MVP)

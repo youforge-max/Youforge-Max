@@ -73,7 +73,18 @@ class EditorExporter(private val context: Context) {
                         .build()
                 )
                 .build()
-            EditedMediaItem.Builder(item).setRemoveAudio(clip.muted).build()
+            val builder = EditedMediaItem.Builder(item).setRemoveAudio(clip.muted)
+            if (clip.speed != 1f) {
+                // Match audio + video speed so they stay in sync.
+                val audio = androidx.media3.common.audio.SonicAudioProcessor().apply { setSpeed(clip.speed) }
+                builder.setEffects(
+                    androidx.media3.transformer.Effects(
+                        listOf<androidx.media3.common.audio.AudioProcessor>(audio),
+                        listOf<Effect>(androidx.media3.effect.SpeedChangeEffect(clip.speed))
+                    )
+                )
+            }
+            builder.build()
         }
         val videoSequence = EditedMediaItemSequence(editedItems)
         // Optional background music as a second (audio-only) sequence; the Composition
