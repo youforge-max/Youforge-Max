@@ -110,6 +110,16 @@ fun VideoEditorScreen() {
             progress = { progress / 100f }, modifier = Modifier.fillMaxWidth()
         )
 
+        // Burned-in title overlay
+        OutlinedTextField(
+            value = project.title,
+            onValueChange = { project = project.copy(title = it) },
+            label = { Text("Title overlay (optional)") },
+            singleLine = true,
+            enabled = !exporting,
+            modifier = Modifier.fillMaxWidth()
+        )
+
         // Export resolution
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Export:", fontSize = 13.sp)

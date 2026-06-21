@@ -59,9 +59,23 @@ class EditorExporter(private val context: Context) {
         val sequence = EditedMediaItemSequence(editedItems)
         // Composition-level video effect: scale every clip to the chosen output height
         // (width follows source aspect), so mixed-resolution clips merge cleanly.
-        val videoEffects: List<Effect> = listOf(
+        val videoEffects: MutableList<Effect> = mutableListOf(
             Presentation.createForHeight(project.resolution.height)
         )
+        // Optional burned-in title (YouForge text on video) via a Media3 text overlay.
+        if (project.title.isNotBlank()) {
+            val span = android.text.SpannableString(project.title).apply {
+                setSpan(android.text.style.AbsoluteSizeSpan(64), 0, length, 0)
+                setSpan(android.text.style.ForegroundColorSpan(android.graphics.Color.WHITE), 0, length, 0)
+                setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, length, 0)
+            }
+            val overlay = androidx.media3.effect.TextOverlay.createStaticTextOverlay(span)
+            videoEffects.add(
+                androidx.media3.effect.OverlayEffect(
+                    com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(overlay)
+                )
+            )
+        }
         val composition = Composition.Builder(listOf(sequence))
             .setEffects(androidx.media3.transformer.Effects(emptyList(), videoEffects))
             .build()

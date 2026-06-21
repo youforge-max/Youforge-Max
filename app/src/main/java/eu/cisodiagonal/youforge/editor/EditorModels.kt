@@ -29,6 +29,7 @@ enum class ExportResolution(val label: String, val height: Int) {
 data class EditorProject(
     val clips: List<Clip> = emptyList(),
     val resolution: ExportResolution = ExportResolution.P720,
+    val title: String = "",
 ) {
     val totalOutMs: Long get() = clips.sumOf { it.outMs }
     val isEmpty: Boolean get() = clips.isEmpty()
