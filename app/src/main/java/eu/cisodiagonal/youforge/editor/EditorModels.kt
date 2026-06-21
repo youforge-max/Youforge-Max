@@ -15,6 +15,8 @@ data class Clip(
     val trimEndMs: Long = durationMs,
     val speed: Float = 1f,
     val muted: Boolean = false,
+    val volume: Float = 1f,
+    val rotationDeg: Int = 0,
 ) {
     /** Output duration of this clip after trim + speed. */
     val outMs: Long get() = ((trimEndMs - trimStartMs).coerceAtLeast(0) / speed).toLong()
@@ -48,6 +50,17 @@ enum class AspectRatio(val label: String, val w: Int, val h: Int) {
     TALL("4:5", 4, 5);
 }
 
+/**
+ * A burned-in sticker: [text] (emoji or short text) drawn at normalised position
+ * [x]/[y] in [0,1] (top-left origin), [sizePx] tall on the output canvas.
+ */
+data class Sticker(
+    val text: String,
+    val x: Float = 0.5f,
+    val y: Float = 0.5f,
+    val sizePx: Int = 140,
+)
+
 /** The whole edit: an ordered list of clips rendered head-to-tail. */
 data class EditorProject(
     val clips: List<Clip> = emptyList(),
@@ -57,6 +70,7 @@ data class EditorProject(
     val filter: VideoFilter = VideoFilter.NONE,
     val transition: Transition = Transition.NONE,
     val aspect: AspectRatio = AspectRatio.SOURCE,
+    val stickers: List<Sticker> = emptyList(),
 ) {
     val totalOutMs: Long get() = clips.sumOf { it.outMs }
     val isEmpty: Boolean get() = clips.isEmpty()

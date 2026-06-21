@@ -52,6 +52,52 @@ private class FadeOverlay(private val clipUs: Long) : androidx.media3.effect.Bit
     }
 }
 
+/** Audio gain via a channel-mixing identity matrix scaled by [v] (mono + stereo). */
+@OptIn(UnstableApi::class)
+private fun gainProcessor(v: Float): androidx.media3.common.audio.ChannelMixingAudioProcessor {
+    fun scaled(ch: Int): androidx.media3.common.audio.ChannelMixingMatrix {
+        val coef = FloatArray(ch * ch)
+        for (i in 0 until ch) coef[i * ch + i] = v
+        return androidx.media3.common.audio.ChannelMixingMatrix(ch, ch, coef)
+    }
+    return androidx.media3.common.audio.ChannelMixingAudioProcessor().apply {
+        putChannelMixingMatrix(scaled(1))
+        putChannelMixingMatrix(scaled(2))
+    }
+}
+
+/** Renders one [Sticker] to a transparent bitmap (emoji/text drawn at its pixel size). */
+private fun stickerBitmap(s: Sticker): android.graphics.Bitmap {
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = s.sizePx.toFloat()
+        color = android.graphics.Color.WHITE
+        setShadowLayer(8f, 0f, 0f, android.graphics.Color.BLACK)
+    }
+    val w = (paint.measureText(s.text).toInt() + s.sizePx / 2).coerceAtLeast(1)
+    val fm = paint.fontMetrics
+    val h = (fm.descent - fm.ascent).toInt().coerceAtLeast(1)
+    val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    android.graphics.Canvas(bmp).drawText(s.text, w / 2f - paint.measureText(s.text) / 2f, -fm.ascent, paint)
+    return bmp
+}
+
+/** Sticker overlays for the whole timeline, anchored on the output canvas. */
+@OptIn(UnstableApi::class)
+fun stickerOverlayEffect(stickers: List<Sticker>): Effect? {
+    if (stickers.isEmpty()) return null
+    val overlays = stickers.filter { it.text.isNotBlank() }.map { s ->
+        // NDC anchor: x in [0,1] -> [-1,1]; y top-left -> NDC y up.
+        val settings = androidx.media3.effect.OverlaySettings.Builder()
+            .setBackgroundFrameAnchor(s.x * 2f - 1f, (1f - s.y) * 2f - 1f)
+            .build()
+        androidx.media3.effect.BitmapOverlay.createStaticBitmapOverlay(stickerBitmap(s), settings)
+    }
+    if (overlays.isEmpty()) return null
+    return androidx.media3.effect.OverlayEffect(
+        com.google.common.collect.ImmutableList.copyOf(overlays.map { it as androidx.media3.effect.TextureOverlay })
+    )
+}
+
 /** Shared filter -> Media3 effect mapping, used by both export and the live preview. */
 @OptIn(UnstableApi::class)
 object EditorEffects {
@@ -101,6 +147,15 @@ class EditorExporter(private val context: Context) {
                 .build()
             val vfx = mutableListOf<Effect>()
             val afx = mutableListOf<androidx.media3.common.audio.AudioProcessor>()
+            if (clip.rotationDeg % 360 != 0) {
+                vfx.add(
+                    androidx.media3.effect.ScaleAndRotateTransformation.Builder()
+                        .setRotationDegrees(clip.rotationDeg.toFloat())
+                        .build()
+                )
+            }
+            // Per-clip volume (skip when muted — audio is already removed).
+            if (!clip.muted && clip.volume != 1f) afx.add(gainProcessor(clip.volume))
             if (clip.speed != 1f) {
                 // Match audio + video speed so they stay in sync.
                 afx.add(androidx.media3.common.audio.SonicAudioProcessor().apply { setSpeed(clip.speed) })
@@ -161,6 +216,8 @@ class EditorExporter(private val context: Context) {
                 )
             )
         }
+        // Burned-in stickers (emoji/text) anchored on the output canvas.
+        stickerOverlayEffect(project.stickers)?.let { videoEffects.add(it) }
         val composition = Composition.Builder(sequences)
             .setEffects(androidx.media3.transformer.Effects(emptyList(), videoEffects))
             .build()

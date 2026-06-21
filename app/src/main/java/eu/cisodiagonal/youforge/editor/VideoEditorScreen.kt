@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 
 /**
@@ -52,7 +53,11 @@ fun VideoEditorScreen() {
     // Single-stack undo: discrete edits snapshot the prior project (trim/title drags
     // stay direct so they don't spam history).
     var undo by remember { mutableStateOf<List<EditorProject>>(emptyList()) }
-    fun edit(p: EditorProject) { undo = (undo + project).takeLast(30); project = p }
+    var redo by remember { mutableStateOf<List<EditorProject>>(emptyList()) }
+    fun edit(p: EditorProject) { undo = (undo + project).takeLast(30); redo = emptyList(); project = p }
+
+    var stickerText by remember { mutableStateOf("") }
+    var stickerSel by remember { mutableIntStateOf(-1) }
 
     // ExoPlayer for the preview; released when the screen leaves composition.
     val player = remember {
@@ -114,11 +119,22 @@ fun VideoEditorScreen() {
         Text("Video Editor", fontSize = 22.sp, fontWeight = FontWeight.Black)
         Text(status, fontSize = 13.sp, color = MaterialTheme.colorScheme.outline)
 
-        // Preview
-        AndroidView(
-            factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } },
-            modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)
-        )
+        // Preview — for a chosen aspect the view is shaped to that ratio and the video
+        // is zoom-cropped to fill it, approximating the export crop. Source = fit.
+        Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
+            val a = project.aspect
+            val viewMod = if (a == AspectRatio.SOURCE) Modifier.fillMaxSize()
+                else Modifier.fillMaxHeight().aspectRatio(a.w.toFloat() / a.h.toFloat())
+            AndroidView(
+                factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } },
+                update = { view ->
+                    view.resizeMode = if (a == AspectRatio.SOURCE)
+                        AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    else AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                },
+                modifier = viewMod
+            )
+        }
 
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Button(onClick = { picker.launch(arrayOf("video/*")) }, enabled = !exporting) {
@@ -156,9 +172,13 @@ fun VideoEditorScreen() {
         // Undo + project save/load
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             TextButton(
-                onClick = { if (undo.isNotEmpty()) { project = undo.last(); undo = undo.dropLast(1); status = "Undone" } },
+                onClick = { if (undo.isNotEmpty()) { redo = (redo + project).takeLast(30); project = undo.last(); undo = undo.dropLast(1); status = "Undone" } },
                 enabled = undo.isNotEmpty() && !exporting
             ) { Text("Undo") }
+            TextButton(
+                onClick = { if (redo.isNotEmpty()) { undo = (undo + project).takeLast(30); project = redo.last(); redo = redo.dropLast(1); status = "Redone" } },
+                enabled = redo.isNotEmpty() && !exporting
+            ) { Text("Redo") }
             TextButton(onClick = { saveProject(context, project); status = "Project saved" }, enabled = !exporting && !project.isEmpty) { Text("Save") }
             TextButton(
                 onClick = {
@@ -233,6 +253,44 @@ fun VideoEditorScreen() {
             }
         }
 
+        // Stickers (emoji / short text burned onto the output canvas)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            OutlinedTextField(
+                value = stickerText,
+                onValueChange = { stickerText = it },
+                label = { Text("Sticker (emoji/text)") },
+                singleLine = true,
+                enabled = !exporting,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
+                modifier = Modifier.width(220.dp)
+            )
+            Button(
+                onClick = {
+                    if (stickerText.isNotBlank()) {
+                        edit(project.copy(stickers = project.stickers + Sticker(stickerText)))
+                        stickerSel = project.stickers.size // index of the new one
+                        stickerText = ""; focus.clearFocus()
+                    }
+                },
+                enabled = !exporting
+            ) { Text("Add") }
+            if (project.stickers.isNotEmpty()) TextButton(
+                onClick = { edit(project.copy(stickers = emptyList())); stickerSel = -1 },
+                enabled = !exporting
+            ) { Text("Clear (${project.stickers.size})") }
+        }
+        // Position sliders for the selected sticker
+        project.stickers.getOrNull(stickerSel)?.let { st ->
+            Text("Sticker “${st.text}” position", fontSize = 13.sp)
+            Slider(value = st.x, onValueChange = { x ->
+                project = project.copy(stickers = project.stickers.toMutableList().also { it[stickerSel] = st.copy(x = x) })
+            }, valueRange = 0f..1f, enabled = !exporting)
+            Slider(value = st.y, onValueChange = { y ->
+                project = project.copy(stickers = project.stickers.toMutableList().also { it[stickerSel] = st.copy(y = y) })
+            }, valueRange = 0f..1f, enabled = !exporting)
+        }
+
         // Trim panel for the selected clip
         project.clips.getOrNull(selected)?.let { clip ->
             TrimPanel(clip) { updated ->
@@ -255,6 +313,24 @@ fun VideoEditorScreen() {
                         enabled = !exporting
                     )
                 }
+            }
+            // Per-clip volume + rotate
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Rotate: ${clip.rotationDeg}°", fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterVertically))
+                TextButton(enabled = !exporting && !clip.muted, onClick = {
+                    edit(project.copy(clips = project.clips.toMutableList().also { it[selected] = clip.copy(rotationDeg = (clip.rotationDeg + 90) % 360) }))
+                }) { Text("Rotate 90°") }
+            }
+            if (!clip.muted) {
+                Text("Volume: ${(clip.volume * 100).toInt()}%", fontSize = 13.sp)
+                Slider(
+                    value = clip.volume,
+                    onValueChange = { v ->
+                        project = project.copy(clips = project.clips.toMutableList().also { it[selected] = clip.copy(volume = v) })
+                    },
+                    valueRange = 0f..2f,
+                    enabled = !exporting
+                )
             }
         }
 
@@ -329,9 +405,12 @@ private fun TrimPanel(clip: Clip, onChange: (Clip) -> Unit) {
 private fun saveProject(context: android.content.Context, p: EditorProject) {
     fun enc(s: String) = android.util.Base64.encodeToString(s.toByteArray(), android.util.Base64.NO_WRAP)
     val sb = StringBuilder()
-    sb.append("v3|${p.resolution.name}|${enc(p.title)}|${p.musicUri?.let { enc(it.toString()) } ?: ""}|${p.filter.name}|${p.transition.name}|${p.aspect.name}\n")
+    sb.append("v4|${p.resolution.name}|${enc(p.title)}|${p.musicUri?.let { enc(it.toString()) } ?: ""}|${p.filter.name}|${p.transition.name}|${p.aspect.name}\n")
     p.clips.forEach { c ->
-        sb.append("${enc(c.uri.toString())}|${c.durationMs}|${c.trimStartMs}|${c.trimEndMs}|${c.speed}|${c.muted}\n")
+        sb.append("${enc(c.uri.toString())}|${c.durationMs}|${c.trimStartMs}|${c.trimEndMs}|${c.speed}|${c.muted}|${c.volume}|${c.rotationDeg}\n")
+    }
+    p.stickers.forEach { s ->
+        sb.append("S|${enc(s.text)}|${s.x}|${s.y}|${s.sizePx}\n")
     }
     java.io.File(context.filesDir, "yf_project.txt").writeText(sb.toString())
 }
@@ -344,13 +423,21 @@ private fun loadProject(context: android.content.Context): EditorProject? {
         val lines = f.readLines().filter { it.isNotBlank() }
         val m = lines.first().split("|")
         val music = m[3].takeIf { it.isNotEmpty() }?.let { Uri.parse(dec(it)) }
-        val clips = lines.drop(1).map { ln ->
+        val body = lines.drop(1)
+        val clips = body.filterNot { it.startsWith("S|") }.map { ln ->
             val c = ln.split("|")
-            Clip(Uri.parse(dec(c[0])), c[1].toLong(), c[2].toLong(), c[3].toLong(), c[4].toFloat(), c[5].toBoolean())
+            Clip(
+                Uri.parse(dec(c[0])), c[1].toLong(), c[2].toLong(), c[3].toLong(), c[4].toFloat(), c[5].toBoolean(),
+                c.getOrNull(6)?.toFloatOrNull() ?: 1f, c.getOrNull(7)?.toIntOrNull() ?: 0
+            )
+        }
+        val stickers = body.filter { it.startsWith("S|") }.mapNotNull { ln ->
+            val s = ln.split("|")
+            runCatching { Sticker(dec(s[1]), s[2].toFloat(), s[3].toFloat(), s[4].toInt()) }.getOrNull()
         }
         val transition = m.getOrNull(5)?.let { runCatching { Transition.valueOf(it) }.getOrNull() } ?: Transition.NONE
         val aspect = m.getOrNull(6)?.let { runCatching { AspectRatio.valueOf(it) }.getOrNull() } ?: AspectRatio.SOURCE
-        EditorProject(clips, ExportResolution.valueOf(m[1]), dec(m[2]), music, VideoFilter.valueOf(m[4]), transition, aspect)
+        EditorProject(clips, ExportResolution.valueOf(m[1]), dec(m[2]), music, VideoFilter.valueOf(m[4]), transition, aspect, stickers)
     }.getOrNull()
 }
 

@@ -53,8 +53,14 @@ things YouForge already has: the **Compose UI** and the **overlay renderer + aud
   (height = resolution.height, width = height·w/h rounded even). Applied at export;
   preview stays source-shape. Saved in project (v3 format). versionName `1.1-max-p7`,
   versionCode 19.
-- **Backlog (not yet):** per-clip volume, rotate, stickers-on-video, slide/zoom
-  transitions, redo (undo is single-stack), live aspect preview (crop).
+- **Backlog cleared (DONE, p8):**
+  - **Per-clip volume** — `ChannelMixingAudioProcessor` identity matrix scaled 0–2× (mono+stereo), slider in the clip panel (hidden when muted).
+  - **Rotate** — `ScaleAndRotateTransformation` 90° steps per clip.
+  - **Stickers-on-video** — emoji/text burned via `BitmapOverlay.createStaticBitmapOverlay` anchored on the output canvas (NDC from normalised x/y); add field + X/Y position sliders + clear.
+  - **Redo** — second stack mirroring undo; `edit()` clears redo.
+  - **Live aspect-crop preview** — `PlayerView` shaped to the chosen ratio + `RESIZE_MODE_ZOOM` (crop-fill); Source = `RESIZE_MODE_FIT`.
+  - Project save/load bumped to v4 (clip volume+rotation, sticker lines `S|…`). versionName `1.1-max-p8`, versionCode 20.
+- **Remaining backlog:** slide/zoom transitions, per-sticker selection/drag, sticker timing (per-clip), aspect ratios on non-crop (letterbox) mode.
 
 ## Notes / risks
 
