@@ -14,14 +14,21 @@ data class Clip(
     val trimStartMs: Long = 0L,
     val trimEndMs: Long = durationMs,
     val speed: Float = 1f,
+    val muted: Boolean = false,
 ) {
     /** Output duration of this clip after trim + speed. */
     val outMs: Long get() = ((trimEndMs - trimStartMs).coerceAtLeast(0) / speed).toLong()
 }
 
+/** Export resolution (output height; width follows source aspect). */
+enum class ExportResolution(val label: String, val height: Int) {
+    P480("480p", 480), P720("720p", 720), P1080("1080p", 1080);
+}
+
 /** The whole edit: an ordered list of clips rendered head-to-tail. */
 data class EditorProject(
     val clips: List<Clip> = emptyList(),
+    val resolution: ExportResolution = ExportResolution.P720,
 ) {
     val totalOutMs: Long get() = clips.sumOf { it.outMs }
     val isEmpty: Boolean get() = clips.isEmpty()

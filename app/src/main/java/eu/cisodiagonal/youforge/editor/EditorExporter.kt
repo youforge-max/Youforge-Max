@@ -4,8 +4,10 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.OptIn
+import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.Presentation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -52,10 +54,17 @@ class EditorExporter(private val context: Context) {
                         .build()
                 )
                 .build()
-            EditedMediaItem.Builder(item).build()
+            EditedMediaItem.Builder(item).setRemoveAudio(clip.muted).build()
         }
         val sequence = EditedMediaItemSequence(editedItems)
-        val composition = Composition.Builder(listOf(sequence)).build()
+        // Composition-level video effect: scale every clip to the chosen output height
+        // (width follows source aspect), so mixed-resolution clips merge cleanly.
+        val videoEffects: List<Effect> = listOf(
+            Presentation.createForHeight(project.resolution.height)
+        )
+        val composition = Composition.Builder(listOf(sequence))
+            .setEffects(androidx.media3.transformer.Effects(emptyList(), videoEffects))
+            .build()
 
         val outDir = File(context.getExternalFilesDir("Movies"), "YouForge").apply { mkdirs() }
         val output = File(outDir, "edit_${System.currentTimeMillis()}.mp4")

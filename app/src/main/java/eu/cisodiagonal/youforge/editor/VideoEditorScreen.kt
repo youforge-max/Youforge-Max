@@ -1,9 +1,11 @@
 package eu.cisodiagonal.youforge.editor
 
+import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +14,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -106,6 +110,19 @@ fun VideoEditorScreen() {
             progress = { progress / 100f }, modifier = Modifier.fillMaxWidth()
         )
 
+        // Export resolution
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Export:", fontSize = 13.sp)
+            ExportResolution.entries.forEach { res ->
+                FilterChip(
+                    selected = project.resolution == res,
+                    onClick = { project = project.copy(resolution = res) },
+                    label = { Text(res.label) },
+                    enabled = !exporting
+                )
+            }
+        }
+
         // Trim panel for the selected clip
         project.clips.getOrNull(selected)?.let { clip ->
             TrimPanel(clip) { updated ->
@@ -130,11 +147,24 @@ fun VideoEditorScreen() {
                     )
                 ) {
                     Row(
-                        Modifier.padding(12.dp).fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        Modifier.padding(10.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Clip ${idx + 1}  ·  ${fmt(clip.outMs)}", fontSize = 14.sp)
+                        val thumb = remember(clip.uri, clip.trimStartMs) {
+                            frameAt(context, clip.uri, clip.trimStartMs)
+                        }
+                        if (thumb != null) Image(
+                            bitmap = thumb.asImageBitmap(), contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(72.dp, 44.dp).then(Modifier)
+                        )
+                        Text("Clip ${idx + 1}  ·  ${fmt(clip.outMs)}", fontSize = 14.sp,
+                            modifier = Modifier.weight(1f))
+                        TextButton(onClick = {
+                            project = project.copy(clips = project.clips.toMutableList()
+                                .also { it[idx] = clip.copy(muted = !clip.muted) })
+                        }) { Text(if (clip.muted) "Unmute" else "Mute") }
                         TextButton(onClick = {
                             val list = project.clips.toMutableList().also { it.removeAt(idx) }
                             project = project.copy(clips = list)
@@ -163,6 +193,16 @@ private fun TrimPanel(clip: Clip, onChange: (Clip) -> Unit) {
         )
     }
 }
+
+/** A single preview frame at [atMs], scaled small for the timeline list. */
+private fun frameAt(context: android.content.Context, uri: Uri, atMs: Long): Bitmap? = runCatching {
+    MediaMetadataRetriever().use { r ->
+        r.setDataSource(context, uri)
+        r.getScaledFrameAtTime(
+            atMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 144, 88
+        )
+    }
+}.getOrNull()
 
 private fun durationOf(context: android.content.Context, uri: Uri): Long? = runCatching {
     MediaMetadataRetriever().use { r ->
