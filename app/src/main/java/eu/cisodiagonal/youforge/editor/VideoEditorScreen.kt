@@ -7,9 +7,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,7 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -35,6 +39,7 @@ import androidx.media3.ui.PlayerView
 @Composable
 fun VideoEditorScreen() {
     val context = LocalContext.current
+    val focus = LocalFocusManager.current
     var project by remember { mutableStateOf(EditorProject()) }
     var selected by remember { mutableIntStateOf(-1) }
     var status by remember { mutableStateOf("Add clips to start.") }
@@ -89,7 +94,10 @@ fun VideoEditorScreen() {
         status = "${project.clips.size} clip(s) · ${fmt(project.totalOutMs)} total"
     }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         Text("Video Editor", fontSize = 22.sp, fontWeight = FontWeight.Black)
         Text(status, fontSize = 13.sp, color = MaterialTheme.colorScheme.outline)
 
@@ -112,6 +120,7 @@ fun VideoEditorScreen() {
             ) { Text(if (project.musicUri != null) "Music ✓" else "Music") }
             Button(
                 onClick = {
+                    focus.clearFocus()
                     exporting = true; progress = 0; status = "Exporting…"
                     exporter.export(project, object : EditorExporter.Callback {
                         override fun onProgress(percent: Int) { progress = percent }
@@ -138,6 +147,8 @@ fun VideoEditorScreen() {
             label = { Text("Title overlay (optional)") },
             singleLine = true,
             enabled = !exporting,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -165,9 +176,8 @@ fun VideoEditorScreen() {
         }
 
         // Clip list (the timeline, as a vertical list for the MVP)
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
-            items(project.clips) { clip ->
-                val idx = project.clips.indexOf(clip)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            project.clips.forEachIndexed { idx, clip ->
                 Card(
                     onClick = { selected = idx },
                     shape = RoundedCornerShape(10.dp),
