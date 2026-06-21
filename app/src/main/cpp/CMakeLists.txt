@@ -13,6 +13,13 @@ set(LLAMA_CURL           OFF CACHE BOOL "" FORCE)
 # OpenMP is not reliably available under the NDK; disable to avoid link errors.
 set(GGML_OPENMP          OFF CACHE BOOL "" FORCE)
 
+# Strip the absolute build path from compiled binaries: __FILE__/assert strings in
+# llama.cpp otherwise bake the builder's home dir into the shipped .so. Rewrite the
+# source/build roots to neutral relative tokens (applies to the llama.cpp subdir too).
+add_compile_options(
+    "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=youforge"
+    "-ffile-prefix-map=${CMAKE_BINARY_DIR}=build")
+
 add_subdirectory(llama.cpp)
 
 add_library(llama-android SHARED llama-android.cpp)

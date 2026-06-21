@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import eu.cisodiagonal.youforge.editor.VideoEditorScreen
 import eu.cisodiagonal.youforge.thumb.ThumbnailScreen
 import eu.cisodiagonal.youforge.video.VideoNormalizerScreen
 
@@ -30,7 +31,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tool { Home, Video, Thumb }
+private enum class Tool { Home, Video, Thumb, Editor }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +56,14 @@ fun YouForgeApp() {
                     )
                 }
             ) { pad -> Box(Modifier.padding(pad)) { VideoNormalizerScreen() } }
+            Tool.Editor -> Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { Text("Video Editor") },
+                        navigationIcon = { TextButton(onClick = { tool = Tool.Home }) { Text("←") } }
+                    )
+                }
+            ) { pad -> Box(Modifier.padding(pad)) { VideoEditorScreen() } }
         }
 
         // Thumbnail Maker is never removed once visited — fills the screen when
@@ -87,6 +96,11 @@ private fun HomeScreen(onOpen: (Tool) -> Unit) {
             title = "Video Normalizer",
             blurb = "Offline 5-band compressor + limiter for video audio. Live preview, presets.",
             onClick = { onOpen(Tool.Video) }
+        )
+        ToolCard(
+            title = "Video Editor (beta)",
+            blurb = "Import clips, trim, and merge into one MP4. On-device Media3, no watermark.",
+            onClick = { onOpen(Tool.Editor) }
         )
     }
 }
