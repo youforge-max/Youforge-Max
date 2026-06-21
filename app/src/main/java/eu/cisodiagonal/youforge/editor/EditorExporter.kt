@@ -56,7 +56,14 @@ class EditorExporter(private val context: Context) {
                 .build()
             EditedMediaItem.Builder(item).setRemoveAudio(clip.muted).build()
         }
-        val sequence = EditedMediaItemSequence(editedItems)
+        val videoSequence = EditedMediaItemSequence(editedItems)
+        // Optional background music as a second (audio-only) sequence; the Composition
+        // mixes it with the clips' own audio. Truncated to the video length.
+        val sequences = mutableListOf(videoSequence)
+        project.musicUri?.let { music ->
+            val musicItem = EditedMediaItem.Builder(MediaItem.fromUri(music)).build()
+            sequences.add(EditedMediaItemSequence(listOf(musicItem)))
+        }
         // Composition-level video effect: scale every clip to the chosen output height
         // (width follows source aspect), so mixed-resolution clips merge cleanly.
         val videoEffects: MutableList<Effect> = mutableListOf(
@@ -76,7 +83,7 @@ class EditorExporter(private val context: Context) {
                 )
             )
         }
-        val composition = Composition.Builder(listOf(sequence))
+        val composition = Composition.Builder(sequences)
             .setEffects(androidx.media3.transformer.Effects(emptyList(), videoEffects))
             .build()
 

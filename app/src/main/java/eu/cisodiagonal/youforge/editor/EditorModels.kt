@@ -30,6 +30,7 @@ data class EditorProject(
     val clips: List<Clip> = emptyList(),
     val resolution: ExportResolution = ExportResolution.P720,
     val title: String = "",
+    val musicUri: Uri? = null,
 ) {
     val totalOutMs: Long get() = clips.sumOf { it.outMs }
     val isEmpty: Boolean get() = clips.isEmpty()

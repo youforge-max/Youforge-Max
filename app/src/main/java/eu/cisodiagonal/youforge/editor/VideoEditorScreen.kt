@@ -58,6 +58,20 @@ fun VideoEditorScreen() {
         }
     }
 
+    val musicPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            project = project.copy(musicUri = uri)
+            status = "Music added · ${project.clips.size} clip(s)"
+        }
+    }
+
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
@@ -89,6 +103,13 @@ fun VideoEditorScreen() {
             Button(onClick = { picker.launch(arrayOf("video/*")) }, enabled = !exporting) {
                 Text("Add clips")
             }
+            OutlinedButton(
+                onClick = {
+                    if (project.musicUri != null) { project = project.copy(musicUri = null); status = "Music removed" }
+                    else musicPicker.launch(arrayOf("audio/*"))
+                },
+                enabled = !exporting
+            ) { Text(if (project.musicUri != null) "Music ✓" else "Music") }
             Button(
                 onClick = {
                     exporting = true; progress = 0; status = "Exporting…"
