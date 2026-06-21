@@ -26,6 +26,32 @@ import java.io.File
  * Transformer must be created and started on a thread with a Looper — we use the main
  * thread and poll progress on it.
  */
+/**
+ * A black [BitmapOverlay] whose alpha ramps the clip in from / out to black at its
+ * edges — a fade transition between consecutive clips (and an intro/outro). The tiny
+ * black bitmap is scaled up to cover the whole frame; [getOverlaySettings] varies the
+ * alpha over the clip's output timeline.
+ */
+@UnstableApi
+private class FadeOverlay(private val clipUs: Long) : androidx.media3.effect.BitmapOverlay() {
+    private val fadeUs = minOf(400_000L, (clipUs / 3).coerceAtLeast(1))
+    private val black = android.graphics.Bitmap
+        .createBitmap(8, 8, android.graphics.Bitmap.Config.ARGB_8888)
+        .apply { eraseColor(android.graphics.Color.BLACK) }
+    private val cover = androidx.media3.effect.OverlaySettings.Builder().setScale(1000f, 1000f)
+
+    override fun getBitmap(presentationTimeUs: Long) = black
+
+    override fun getOverlaySettings(presentationTimeUs: Long): androidx.media3.effect.OverlaySettings {
+        val a = when {
+            presentationTimeUs < fadeUs -> 1f - presentationTimeUs.toFloat() / fadeUs
+            presentationTimeUs > clipUs - fadeUs -> (presentationTimeUs - (clipUs - fadeUs)).toFloat() / fadeUs
+            else -> 0f
+        }.coerceIn(0f, 1f)
+        return cover.setAlphaScale(a).build()
+    }
+}
+
 /** Shared filter -> Media3 effect mapping, used by both export and the live preview. */
 @OptIn(UnstableApi::class)
 object EditorEffects {
@@ -73,16 +99,27 @@ class EditorExporter(private val context: Context) {
                         .build()
                 )
                 .build()
-            val builder = EditedMediaItem.Builder(item).setRemoveAudio(clip.muted)
+            val vfx = mutableListOf<Effect>()
+            val afx = mutableListOf<androidx.media3.common.audio.AudioProcessor>()
             if (clip.speed != 1f) {
                 // Match audio + video speed so they stay in sync.
-                val audio = androidx.media3.common.audio.SonicAudioProcessor().apply { setSpeed(clip.speed) }
-                builder.setEffects(
-                    androidx.media3.transformer.Effects(
-                        listOf<androidx.media3.common.audio.AudioProcessor>(audio),
-                        listOf<Effect>(androidx.media3.effect.SpeedChangeEffect(clip.speed))
+                afx.add(androidx.media3.common.audio.SonicAudioProcessor().apply { setSpeed(clip.speed) })
+                vfx.add(androidx.media3.effect.SpeedChangeEffect(clip.speed))
+            }
+            if (project.transition == Transition.FADE && project.clips.size > 1) {
+                // Fade each clip in/out of black at its edges (added after speed so it
+                // works in the clip's output timeline).
+                vfx.add(
+                    androidx.media3.effect.OverlayEffect(
+                        com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(
+                            FadeOverlay(clip.outMs * 1000L)
+                        )
                     )
                 )
+            }
+            val builder = EditedMediaItem.Builder(item).setRemoveAudio(clip.muted)
+            if (vfx.isNotEmpty() || afx.isNotEmpty()) {
+                builder.setEffects(androidx.media3.transformer.Effects(afx, vfx))
             }
             builder.build()
         }

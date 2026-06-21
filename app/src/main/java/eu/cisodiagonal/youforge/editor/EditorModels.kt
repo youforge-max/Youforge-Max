@@ -30,6 +30,11 @@ enum class VideoFilter(val label: String) {
     NONE("None"), GRAYSCALE("B&W"), VIVID("Vivid"), WARM("Warm"), COOL("Cool"), CONTRAST("Punch");
 }
 
+/** Transition between clips. FADE = each clip fades in/out of black at its edges. */
+enum class Transition(val label: String) {
+    NONE("None"), FADE("Fade");
+}
+
 /** The whole edit: an ordered list of clips rendered head-to-tail. */
 data class EditorProject(
     val clips: List<Clip> = emptyList(),
@@ -37,6 +42,7 @@ data class EditorProject(
     val title: String = "",
     val musicUri: Uri? = null,
     val filter: VideoFilter = VideoFilter.NONE,
+    val transition: Transition = Transition.NONE,
 ) {
     val totalOutMs: Long get() = clips.sumOf { it.outMs }
     val isEmpty: Boolean get() = clips.isEmpty()

@@ -44,7 +44,12 @@ things YouForge already has: the **Compose UI** and the **overlay renderer + aud
   **project save/load** (clips+trim+mute+title+music+filter+resolution → filesDir).
 - **Fit:** all control rows use `FlowRow` (wrap) + the screen scrolls, so nothing
   runs off-screen (verified on Tab S7+ geometry 2800×1752).
-- **Deferred:** per-clip speed (`SpeedChangeEffect`), transitions, redo.
+- **Per-clip speed (DONE):** `SpeedChangeEffect` + `SonicAudioProcessor` (0.25×–2×).
+- **Transitions (DONE):** `Fade` — each clip fades in/out of black at its edges via a
+  time-varying black `BitmapOverlay` (Media3 has no built-in clip crossfade).
+- **Reorder (DONE):** move clips left/right in the timeline.
+- **Backlog (not yet):** per-clip volume, rotate/crop, stickers-on-video, slide/zoom
+  transitions, redo (undo is single-stack), aspect-ratio/canvas.
 
 ## Notes / risks
 

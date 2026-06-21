@@ -207,6 +207,19 @@ fun VideoEditorScreen() {
             }
         }
 
+        // Transition between clips
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Transition:", fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterVertically))
+            Transition.entries.forEach { t ->
+                FilterChip(
+                    selected = project.transition == t,
+                    onClick = { edit(project.copy(transition = t)) },
+                    label = { Text(t.label) },
+                    enabled = !exporting
+                )
+            }
+        }
+
         // Trim panel for the selected clip
         project.clips.getOrNull(selected)?.let { clip ->
             TrimPanel(clip) { updated ->
@@ -259,6 +272,14 @@ fun VideoEditorScreen() {
                         )
                         Text("Clip ${idx + 1}  ·  ${fmt(clip.outMs)}", fontSize = 14.sp,
                             modifier = Modifier.weight(1f))
+                        TextButton(enabled = idx > 0 && !exporting, onClick = {
+                            edit(project.copy(clips = project.clips.toMutableList().also { java.util.Collections.swap(it, idx, idx - 1) }))
+                            selected = idx - 1
+                        }) { Text("◀") }
+                        TextButton(enabled = idx < project.clips.size - 1 && !exporting, onClick = {
+                            edit(project.copy(clips = project.clips.toMutableList().also { java.util.Collections.swap(it, idx, idx + 1) }))
+                            selected = idx + 1
+                        }) { Text("▶") }
                         TextButton(onClick = {
                             edit(project.copy(clips = project.clips.toMutableList()
                                 .also { it[idx] = clip.copy(muted = !clip.muted) }))
@@ -295,7 +316,7 @@ private fun TrimPanel(clip: Clip, onChange: (Clip) -> Unit) {
 private fun saveProject(context: android.content.Context, p: EditorProject) {
     fun enc(s: String) = android.util.Base64.encodeToString(s.toByteArray(), android.util.Base64.NO_WRAP)
     val sb = StringBuilder()
-    sb.append("v1|${p.resolution.name}|${enc(p.title)}|${p.musicUri?.let { enc(it.toString()) } ?: ""}|${p.filter.name}\n")
+    sb.append("v2|${p.resolution.name}|${enc(p.title)}|${p.musicUri?.let { enc(it.toString()) } ?: ""}|${p.filter.name}|${p.transition.name}\n")
     p.clips.forEach { c ->
         sb.append("${enc(c.uri.toString())}|${c.durationMs}|${c.trimStartMs}|${c.trimEndMs}|${c.speed}|${c.muted}\n")
     }
@@ -314,7 +335,8 @@ private fun loadProject(context: android.content.Context): EditorProject? {
             val c = ln.split("|")
             Clip(Uri.parse(dec(c[0])), c[1].toLong(), c[2].toLong(), c[3].toLong(), c[4].toFloat(), c[5].toBoolean())
         }
-        EditorProject(clips, ExportResolution.valueOf(m[1]), dec(m[2]), music, VideoFilter.valueOf(m[4]))
+        val transition = m.getOrNull(5)?.let { runCatching { Transition.valueOf(it) }.getOrNull() } ?: Transition.NONE
+        EditorProject(clips, ExportResolution.valueOf(m[1]), dec(m[2]), music, VideoFilter.valueOf(m[4]), transition)
     }.getOrNull()
 }
 
