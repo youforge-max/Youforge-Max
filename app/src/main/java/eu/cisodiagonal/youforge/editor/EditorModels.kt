@@ -22,7 +22,12 @@ data class Clip(
 
 /** Export resolution (output height; width follows source aspect). */
 enum class ExportResolution(val label: String, val height: Int) {
-    P480("480p", 480), P720("720p", 720), P1080("1080p", 1080);
+    P480("480p", 480), P720("720p", 720), P1080("1080p", 1080), P2160("4K", 2160);
+}
+
+/** Colour filter applied to the whole timeline at export (and the live preview). */
+enum class VideoFilter(val label: String) {
+    NONE("None"), GRAYSCALE("B&W"), VIVID("Vivid"), WARM("Warm"), COOL("Cool"), CONTRAST("Punch");
 }
 
 /** The whole edit: an ordered list of clips rendered head-to-tail. */
@@ -31,6 +36,7 @@ data class EditorProject(
     val resolution: ExportResolution = ExportResolution.P720,
     val title: String = "",
     val musicUri: Uri? = null,
+    val filter: VideoFilter = VideoFilter.NONE,
 ) {
     val totalOutMs: Long get() = clips.sumOf { it.outMs }
     val isEmpty: Boolean get() = clips.isEmpty()

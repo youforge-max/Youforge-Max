@@ -26,6 +26,25 @@ import java.io.File
  * Transformer must be created and started on a thread with a Looper — we use the main
  * thread and poll progress on it.
  */
+/** Shared filter -> Media3 effect mapping, used by both export and the live preview. */
+@OptIn(UnstableApi::class)
+object EditorEffects {
+    fun forFilter(filter: VideoFilter): List<Effect> = when (filter) {
+        VideoFilter.NONE -> emptyList()
+        VideoFilter.GRAYSCALE -> listOf(androidx.media3.effect.RgbFilter.createGrayscaleFilter())
+        VideoFilter.VIVID -> listOf(
+            androidx.media3.effect.HslAdjustment.Builder().adjustSaturation(40f).build()
+        )
+        VideoFilter.WARM -> listOf(
+            androidx.media3.effect.RgbAdjustment.Builder().setRedScale(1.15f).setBlueScale(0.88f).build()
+        )
+        VideoFilter.COOL -> listOf(
+            androidx.media3.effect.RgbAdjustment.Builder().setRedScale(0.88f).setBlueScale(1.15f).build()
+        )
+        VideoFilter.CONTRAST -> listOf(androidx.media3.effect.Contrast(0.35f))
+    }
+}
+
 @OptIn(UnstableApi::class)
 class EditorExporter(private val context: Context) {
 
@@ -69,6 +88,7 @@ class EditorExporter(private val context: Context) {
         val videoEffects: MutableList<Effect> = mutableListOf(
             Presentation.createForHeight(project.resolution.height)
         )
+        videoEffects.addAll(EditorEffects.forFilter(project.filter))
         // Optional burned-in title (YouForge text on video) via a Media3 text overlay.
         if (project.title.isNotBlank()) {
             val span = android.text.SpannableString(project.title).apply {

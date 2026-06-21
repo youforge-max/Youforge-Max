@@ -36,6 +36,7 @@ import androidx.media3.ui.PlayerView
  * are the next phases (the engine and overlay renderer already exist to back them).
  */
 @OptIn(ExperimentalMaterial3Api::class)
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun VideoEditorScreen() {
     val context = LocalContext.current
@@ -48,6 +49,11 @@ fun VideoEditorScreen() {
 
     val exporter = remember { EditorExporter(context) }
 
+    // Single-stack undo: discrete edits snapshot the prior project (trim/title drags
+    // stay direct so they don't spam history).
+    var undo by remember { mutableStateOf<List<EditorProject>>(emptyList()) }
+    fun edit(p: EditorProject) { undo = (undo + project).takeLast(30); project = p }
+
     // ExoPlayer for the preview; released when the screen leaves composition.
     val player = remember {
         ExoPlayer.Builder(context).build().apply { playWhenReady = false }
@@ -55,10 +61,12 @@ fun VideoEditorScreen() {
     DisposableEffect(Unit) { onDispose { player.release() } }
 
     // (Re)load the preview when the selected clip changes.
-    LaunchedEffect(selected, project.clips.size) {
+    LaunchedEffect(selected, project.clips.size, project.filter) {
         val c = project.clips.getOrNull(selected)
         if (c != null) {
             player.setMediaItem(MediaItem.fromUri(c.uri))
+            // Live filter preview (best-effort; the filter always applies at export).
+            runCatching { player.setVideoEffects(EditorEffects.forFilter(project.filter)) }
             player.prepare()
         }
     }
@@ -89,7 +97,7 @@ fun VideoEditorScreen() {
             }
             durationOf(context, uri)?.let { dur -> Clip(uri = uri, durationMs = dur) }
         }
-        project = project.copy(clips = project.clips + added)
+        edit(project.copy(clips = project.clips + added))
         if (selected < 0 && project.clips.isNotEmpty()) selected = 0
         status = "${project.clips.size} clip(s) · ${fmt(project.totalOutMs)} total"
     }
@@ -113,7 +121,7 @@ fun VideoEditorScreen() {
             }
             OutlinedButton(
                 onClick = {
-                    if (project.musicUri != null) { project = project.copy(musicUri = null); status = "Music removed" }
+                    if (project.musicUri != null) { edit(project.copy(musicUri = null)); status = "Music removed" }
                     else musicPicker.launch(arrayOf("audio/*"))
                 },
                 enabled = !exporting
@@ -140,6 +148,22 @@ fun VideoEditorScreen() {
             progress = { progress / 100f }, modifier = Modifier.fillMaxWidth()
         )
 
+        // Undo + project save/load
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(
+                onClick = { if (undo.isNotEmpty()) { project = undo.last(); undo = undo.dropLast(1); status = "Undone" } },
+                enabled = undo.isNotEmpty() && !exporting
+            ) { Text("Undo") }
+            TextButton(onClick = { saveProject(context, project); status = "Project saved" }, enabled = !exporting && !project.isEmpty) { Text("Save") }
+            TextButton(
+                onClick = {
+                    loadProject(context)?.let { edit(it); selected = if (it.clips.isEmpty()) -1 else 0; status = "Project loaded · ${it.clips.size} clip(s)" }
+                        ?: run { status = "No saved project" }
+                },
+                enabled = !exporting
+            ) { Text("Load") }
+        }
+
         // Burned-in title overlay
         OutlinedTextField(
             value = project.title,
@@ -158,8 +182,21 @@ fun VideoEditorScreen() {
             ExportResolution.entries.forEach { res ->
                 FilterChip(
                     selected = project.resolution == res,
-                    onClick = { project = project.copy(resolution = res) },
+                    onClick = { edit(project.copy(resolution = res)) },
                     label = { Text(res.label) },
+                    enabled = !exporting
+                )
+            }
+        }
+
+        // Colour filter (live preview + applied at export)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Filter:", fontSize = 13.sp)
+            VideoFilter.entries.forEach { f ->
+                FilterChip(
+                    selected = project.filter == f,
+                    onClick = { edit(project.copy(filter = f)) },
+                    label = { Text(f.label) },
                     enabled = !exporting
                 )
             }
@@ -203,12 +240,12 @@ fun VideoEditorScreen() {
                         Text("Clip ${idx + 1}  ·  ${fmt(clip.outMs)}", fontSize = 14.sp,
                             modifier = Modifier.weight(1f))
                         TextButton(onClick = {
-                            project = project.copy(clips = project.clips.toMutableList()
-                                .also { it[idx] = clip.copy(muted = !clip.muted) })
+                            edit(project.copy(clips = project.clips.toMutableList()
+                                .also { it[idx] = clip.copy(muted = !clip.muted) }))
                         }) { Text(if (clip.muted) "Unmute" else "Mute") }
                         TextButton(onClick = {
                             val list = project.clips.toMutableList().also { it.removeAt(idx) }
-                            project = project.copy(clips = list)
+                            edit(project.copy(clips = list))
                             selected = (selected).coerceIn(-1, list.size - 1)
                         }) { Text("Remove") }
                     }
@@ -233,6 +270,32 @@ private fun TrimPanel(clip: Clip, onChange: (Clip) -> Unit) {
             valueRange = 0f..clip.durationMs.toFloat()
         )
     }
+}
+
+private fun saveProject(context: android.content.Context, p: EditorProject) {
+    fun enc(s: String) = android.util.Base64.encodeToString(s.toByteArray(), android.util.Base64.NO_WRAP)
+    val sb = StringBuilder()
+    sb.append("v1|${p.resolution.name}|${enc(p.title)}|${p.musicUri?.let { enc(it.toString()) } ?: ""}|${p.filter.name}\n")
+    p.clips.forEach { c ->
+        sb.append("${enc(c.uri.toString())}|${c.durationMs}|${c.trimStartMs}|${c.trimEndMs}|${c.speed}|${c.muted}\n")
+    }
+    java.io.File(context.filesDir, "yf_project.txt").writeText(sb.toString())
+}
+
+private fun loadProject(context: android.content.Context): EditorProject? {
+    val f = java.io.File(context.filesDir, "yf_project.txt")
+    if (!f.isFile) return null
+    return runCatching {
+        fun dec(s: String) = String(android.util.Base64.decode(s, android.util.Base64.NO_WRAP))
+        val lines = f.readLines().filter { it.isNotBlank() }
+        val m = lines.first().split("|")
+        val music = m[3].takeIf { it.isNotEmpty() }?.let { Uri.parse(dec(it)) }
+        val clips = lines.drop(1).map { ln ->
+            val c = ln.split("|")
+            Clip(Uri.parse(dec(c[0])), c[1].toLong(), c[2].toLong(), c[3].toLong(), c[4].toFloat(), c[5].toBoolean())
+        }
+        EditorProject(clips, ExportResolution.valueOf(m[1]), dec(m[2]), music, VideoFilter.valueOf(m[4]))
+    }.getOrNull()
 }
 
 /** A single preview frame at [atMs], scaled small for the timeline list. */
