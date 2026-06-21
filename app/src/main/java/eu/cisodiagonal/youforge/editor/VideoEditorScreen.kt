@@ -220,6 +220,19 @@ fun VideoEditorScreen() {
             }
         }
 
+        // Output aspect ratio / canvas (crop-fill; applied at export)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Aspect:", fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterVertically))
+            AspectRatio.entries.forEach { a ->
+                FilterChip(
+                    selected = project.aspect == a,
+                    onClick = { edit(project.copy(aspect = a)) },
+                    label = { Text(a.label) },
+                    enabled = !exporting
+                )
+            }
+        }
+
         // Trim panel for the selected clip
         project.clips.getOrNull(selected)?.let { clip ->
             TrimPanel(clip) { updated ->
@@ -316,7 +329,7 @@ private fun TrimPanel(clip: Clip, onChange: (Clip) -> Unit) {
 private fun saveProject(context: android.content.Context, p: EditorProject) {
     fun enc(s: String) = android.util.Base64.encodeToString(s.toByteArray(), android.util.Base64.NO_WRAP)
     val sb = StringBuilder()
-    sb.append("v2|${p.resolution.name}|${enc(p.title)}|${p.musicUri?.let { enc(it.toString()) } ?: ""}|${p.filter.name}|${p.transition.name}\n")
+    sb.append("v3|${p.resolution.name}|${enc(p.title)}|${p.musicUri?.let { enc(it.toString()) } ?: ""}|${p.filter.name}|${p.transition.name}|${p.aspect.name}\n")
     p.clips.forEach { c ->
         sb.append("${enc(c.uri.toString())}|${c.durationMs}|${c.trimStartMs}|${c.trimEndMs}|${c.speed}|${c.muted}\n")
     }
@@ -336,7 +349,8 @@ private fun loadProject(context: android.content.Context): EditorProject? {
             Clip(Uri.parse(dec(c[0])), c[1].toLong(), c[2].toLong(), c[3].toLong(), c[4].toFloat(), c[5].toBoolean())
         }
         val transition = m.getOrNull(5)?.let { runCatching { Transition.valueOf(it) }.getOrNull() } ?: Transition.NONE
-        EditorProject(clips, ExportResolution.valueOf(m[1]), dec(m[2]), music, VideoFilter.valueOf(m[4]), transition)
+        val aspect = m.getOrNull(6)?.let { runCatching { AspectRatio.valueOf(it) }.getOrNull() } ?: AspectRatio.SOURCE
+        EditorProject(clips, ExportResolution.valueOf(m[1]), dec(m[2]), music, VideoFilter.valueOf(m[4]), transition, aspect)
     }.getOrNull()
 }
 

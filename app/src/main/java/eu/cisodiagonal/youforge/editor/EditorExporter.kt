@@ -131,11 +131,21 @@ class EditorExporter(private val context: Context) {
             val musicItem = EditedMediaItem.Builder(MediaItem.fromUri(music)).build()
             sequences.add(EditedMediaItemSequence(listOf(musicItem)))
         }
-        // Composition-level video effect: scale every clip to the chosen output height
-        // (width follows source aspect), so mixed-resolution clips merge cleanly.
-        val videoEffects: MutableList<Effect> = mutableListOf(
+        // Composition-level video effect: normalise every clip to the chosen canvas so
+        // mixed-resolution/aspect clips merge cleanly. SOURCE keeps the source shape
+        // (scale to height, width follows source); the named ratios crop-fill to a fixed
+        // WxH (output height = resolution.height, width = height * w / h, rounded even).
+        val presentation = if (project.aspect == AspectRatio.SOURCE) {
             Presentation.createForHeight(project.resolution.height)
-        )
+        } else {
+            val h = project.resolution.height
+            var w = Math.round(h.toFloat() * project.aspect.w / project.aspect.h)
+            if (w % 2 != 0) w += 1
+            Presentation.createForWidthAndHeight(
+                w, h, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
+            )
+        }
+        val videoEffects: MutableList<Effect> = mutableListOf(presentation)
         videoEffects.addAll(EditorEffects.forFilter(project.filter))
         // Optional burned-in title (YouForge text on video) via a Media3 text overlay.
         if (project.title.isNotBlank()) {

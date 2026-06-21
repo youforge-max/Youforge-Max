@@ -35,6 +35,19 @@ enum class Transition(val label: String) {
     NONE("None"), FADE("Fade");
 }
 
+/**
+ * Output canvas aspect ratio. SOURCE keeps the source shape (width follows source);
+ * the others crop-fill to the named ratio. [w]/[h] are the ratio terms; output height
+ * is [ExportResolution.height], width = height * w / h (rounded even).
+ */
+enum class AspectRatio(val label: String, val w: Int, val h: Int) {
+    SOURCE("Source", 0, 0),
+    LANDSCAPE("16:9", 16, 9),
+    PORTRAIT("9:16", 9, 16),
+    SQUARE("1:1", 1, 1),
+    TALL("4:5", 4, 5);
+}
+
 /** The whole edit: an ordered list of clips rendered head-to-tail. */
 data class EditorProject(
     val clips: List<Clip> = emptyList(),
@@ -43,6 +56,7 @@ data class EditorProject(
     val musicUri: Uri? = null,
     val filter: VideoFilter = VideoFilter.NONE,
     val transition: Transition = Transition.NONE,
+    val aspect: AspectRatio = AspectRatio.SOURCE,
 ) {
     val totalOutMs: Long get() = clips.sumOf { it.outMs }
     val isEmpty: Boolean get() = clips.isEmpty()

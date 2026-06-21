@@ -12,8 +12,8 @@ android {
         applicationId = "eu.cisodiagonal.youforge"
         minSdk = 29              // MediaPipe GenAI runs on 24+; SAF + Compose fine on 29
         targetSdk = 35
-        versionCode = 18
-        versionName = "1.1-max-p1"
+        versionCode = 19
+        versionName = "1.1-max-p7"
 
         // Tablet is arm64; drop the other ABIs' native libs to slim the APK.
         ndk { abiFilters += "arm64-v8a" }

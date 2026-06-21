@@ -48,8 +48,13 @@ things YouForge already has: the **Compose UI** and the **overlay renderer + aud
 - **Transitions (DONE):** `Fade` — each clip fades in/out of black at its edges via a
   time-varying black `BitmapOverlay` (Media3 has no built-in clip crossfade).
 - **Reorder (DONE):** move clips left/right in the timeline.
-- **Backlog (not yet):** per-clip volume, rotate/crop, stickers-on-video, slide/zoom
-  transitions, redo (undo is single-stack), aspect-ratio/canvas.
+- **Aspect / canvas (DONE):** output ratio chips — Source / 16:9 / 9:16 / 1:1 / 4:5 —
+  crop-fill via `Presentation.createForWidthAndHeight(w, h, LAYOUT_SCALE_TO_FIT_WITH_CROP)`
+  (height = resolution.height, width = height·w/h rounded even). Applied at export;
+  preview stays source-shape. Saved in project (v3 format). versionName `1.1-max-p7`,
+  versionCode 19.
+- **Backlog (not yet):** per-clip volume, rotate, stickers-on-video, slide/zoom
+  transitions, redo (undo is single-stack), live aspect preview (crop).
 
 ## Notes / risks
 
