@@ -35,7 +35,7 @@ import androidx.media3.ui.PlayerView
  * clip with ExoPlayer. Speed / text+sticker overlays / music / filters / transitions
  * are the next phases (the engine and overlay renderer already exist to back them).
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun VideoEditorScreen() {
@@ -115,7 +115,7 @@ fun VideoEditorScreen() {
             modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Button(onClick = { picker.launch(arrayOf("video/*")) }, enabled = !exporting) {
                 Text("Add clips")
             }
@@ -149,7 +149,7 @@ fun VideoEditorScreen() {
         )
 
         // Undo + project save/load
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             TextButton(
                 onClick = { if (undo.isNotEmpty()) { project = undo.last(); undo = undo.dropLast(1); status = "Undone" } },
                 enabled = undo.isNotEmpty() && !exporting
@@ -176,9 +176,9 @@ fun VideoEditorScreen() {
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Export resolution
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Export:", fontSize = 13.sp)
+        // Export resolution (wraps so the chips never run off-screen)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Export:", fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterVertically))
             ExportResolution.entries.forEach { res ->
                 FilterChip(
                     selected = project.resolution == res,
@@ -190,8 +190,8 @@ fun VideoEditorScreen() {
         }
 
         // Colour filter (live preview + applied at export)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Filter:", fontSize = 13.sp)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Filter:", fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterVertically))
             VideoFilter.entries.forEach { f ->
                 FilterChip(
                     selected = project.filter == f,
