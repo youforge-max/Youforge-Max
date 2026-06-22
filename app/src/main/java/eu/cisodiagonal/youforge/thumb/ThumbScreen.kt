@@ -1048,6 +1048,37 @@ private fun ModelDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Download custom URL") }
 
+                HorizontalDivider()
+                // DEV: keep downloaded models on shared storage so they survive a reinstall.
+                val persistent = remember(refresh) { modelMgr.isPersistentLocation() }
+                Text(
+                    if (persistent) "Models kept on shared storage — survive uninstall (dev)."
+                    else "Models in app storage — removed when the app is uninstalled.",
+                    style = MaterialTheme.typography.labelSmall
+                )
+                if (!persistent && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    OutlinedButton(
+                        onClick = {
+                            val opened = runCatching {
+                                context.startActivity(
+                                    android.content.Intent(
+                                        android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                        android.net.Uri.parse("package:${context.packageName}")
+                                    )
+                                )
+                            }.isSuccess
+                            if (!opened) runCatching {
+                                context.startActivity(
+                                    android.content.Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                                )
+                            }
+                            msg = "Grant All-files access, then reopen the app — models move to shared storage."
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Keep models after uninstall (dev)") }
+                }
+
                 if (modelMgr.installedSlugs().isNotEmpty()) {
                     TextButton(onClick = {
                         modelMgr.deleteAll(); refresh++; onReadyChange(false); msg = "All models deleted."

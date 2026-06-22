@@ -1,6 +1,8 @@
 package eu.cisodiagonal.youforge.thumb
 
 import android.content.Context
+import android.os.Build
+import android.os.Environment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -17,12 +19,46 @@ class ModelManager(context: Context) {
 
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences("yf_models", Context.MODE_PRIVATE)
-    private val modelsDir = File(appContext.filesDir, "models").apply { mkdirs() }
+    private val modelsDir = resolveModelsDir(appContext)
     private val legacy = File(appContext.filesDir, "gemma.task")   // pre-multi-model file
 
     companion object {
         const val MIN_BYTES = 1_000_000L
         const val IMPORTED_SLUG = "imported"
+        // DEV: keeping models here (shared storage) lets them survive an app reinstall, so
+        // the multi-GB models aren't re-downloaded every dev cycle. Needs All-files access.
+        const val SHARED_DIR_NAME = "YouForgeModels"
+    }
+
+    /** All-files access granted (Android 11+) — required to keep models on shared storage. */
+    fun canPersistAcrossUninstall(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()
+
+    /** True when models currently live in the uninstall-surviving shared dir. */
+    fun isPersistentLocation(): Boolean =
+        modelsDir.absolutePath.startsWith(Environment.getExternalStorageDirectory().absolutePath)
+
+    /** Human-readable path where models are stored. */
+    fun modelsLocation(): String = modelsDir.absolutePath
+
+    /**
+     * Where models live: the shared [SHARED_DIR_NAME] dir (survives uninstall) when All-files
+     * access is granted, otherwise app-internal storage (wiped on uninstall). When switching
+     * to shared, any models already in internal storage are migrated across.
+     */
+    private fun resolveModelsDir(ctx: Context): File {
+        val internal = File(ctx.filesDir, "models")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()) {
+            val ext = File(Environment.getExternalStorageDirectory(), SHARED_DIR_NAME)
+            if (ext.exists() || ext.mkdirs()) {
+                if (internal.isDirectory) internal.listFiles()?.forEach { f ->
+                    val dst = File(ext, f.name)
+                    if (!dst.exists()) runCatching { f.copyTo(dst, overwrite = false); f.delete() }
+                }
+                return ext
+            }
+        }
+        return internal.apply { mkdirs() }
     }
 
     private fun fileFor(slug: String, format: ModelFormat) = File(modelsDir, "$slug.${format.ext}")
