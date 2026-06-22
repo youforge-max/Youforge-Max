@@ -65,7 +65,8 @@ things YouForge already has: the **Compose UI** and the **overlay renderer + aud
   - **Per-sticker select/delete** — chip row selects any existing sticker (was only on-add); per-sticker Delete button.
   - **Per-sticker timing** — `Sticker.startMs/endMs` (−1 = until end); export uses a `TimedSticker` `BitmapOverlay` that alpha-gates by output-timeline `presentationTimeUs`; start/end sliders in the sticker panel.
   - Project save/load bumped to v5 (header `letterbox`, sticker lines `S|…|startMs|endMs`); v4/older still load.
-- **Remaining backlog:** slide/zoom transitions (deferred — Media3 1.4.1 stock effects are static; true crossfade/slide needs overlapping compositing or a custom animated GL shader), per-sticker drag (sliders only for now).
+- **Slide/zoom transitions (DONE, p10):** `MatrixTransformation` (time-varying 2D matrix in NDC, clip-local timeline) — `SlideTransition` translates the frame in from left / out to right over black; `ZoomTransition` punch-zooms in at the start and out at the end (scale about centre). Wired alongside FADE in a `when` on `project.transition`; chips auto-populate from the enum. versionName `1.1-max-p10`, versionCode 22.
+- **Remaining backlog:** true crossfade between clips (needs overlapping compositing — Media3 sequences are head-to-tail, out of scope), per-sticker drag (sliders only for now).
 
 ## Notes / risks
 

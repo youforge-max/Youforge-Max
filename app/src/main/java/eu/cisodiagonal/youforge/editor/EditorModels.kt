@@ -32,9 +32,13 @@ enum class VideoFilter(val label: String) {
     NONE("None"), GRAYSCALE("B&W"), VIVID("Vivid"), WARM("Warm"), COOL("Cool"), CONTRAST("Punch");
 }
 
-/** Transition between clips. FADE = each clip fades in/out of black at its edges. */
+/**
+ * Transition at each clip's edges (applied in the clip's own output timeline).
+ * FADE = fade in/out of black; SLIDE = slide in from left / out to right over black;
+ * ZOOM = punch-zoom in at the start and out at the end.
+ */
 enum class Transition(val label: String) {
-    NONE("None"), FADE("Fade");
+    NONE("None"), FADE("Fade"), SLIDE("Slide"), ZOOM("Zoom");
 }
 
 /**

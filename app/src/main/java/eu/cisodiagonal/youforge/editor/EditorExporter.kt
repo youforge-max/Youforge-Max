@@ -52,6 +52,46 @@ private class FadeOverlay(private val clipUs: Long) : androidx.media3.effect.Bit
     }
 }
 
+/**
+ * Slide transition: the frame slides in from the left at the clip's start and out to the
+ * right at its end (black shows behind during the slide). A time-varying 2D matrix in NDC
+ * space (frame width = 2); identity in the middle of the clip.
+ */
+@UnstableApi
+private class SlideTransition(private val clipUs: Long) : androidx.media3.effect.MatrixTransformation {
+    private val edgeUs = minOf(400_000L, (clipUs / 3).coerceAtLeast(1))
+    override fun getMatrix(presentationTimeUs: Long): android.graphics.Matrix {
+        val tx = when {
+            presentationTimeUs < edgeUs ->
+                -2f + 2f * (presentationTimeUs.toFloat() / edgeUs)
+            presentationTimeUs > clipUs - edgeUs ->
+                2f * ((presentationTimeUs - (clipUs - edgeUs)).toFloat() / edgeUs)
+            else -> 0f
+        }.coerceIn(-2f, 2f)
+        return android.graphics.Matrix().apply { postTranslate(tx, 0f) }
+    }
+}
+
+/**
+ * Zoom transition: a punch-zoom that starts magnified and settles to 1× at the clip's
+ * start, then zooms back in at its end. Scale about the frame centre (NDC origin).
+ */
+@UnstableApi
+private class ZoomTransition(private val clipUs: Long) : androidx.media3.effect.MatrixTransformation {
+    private val edgeUs = minOf(500_000L, (clipUs / 3).coerceAtLeast(1))
+    private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t.coerceIn(0f, 1f)
+    override fun getMatrix(presentationTimeUs: Long): android.graphics.Matrix {
+        val s = when {
+            presentationTimeUs < edgeUs ->
+                lerp(1.4f, 1f, presentationTimeUs.toFloat() / edgeUs)
+            presentationTimeUs > clipUs - edgeUs ->
+                lerp(1f, 1.4f, (presentationTimeUs - (clipUs - edgeUs)).toFloat() / edgeUs)
+            else -> 1f
+        }
+        return android.graphics.Matrix().apply { postScale(s, s) }
+    }
+}
+
 /** Audio gain via a channel-mixing identity matrix scaled by [v] (mono + stereo). */
 @OptIn(UnstableApi::class)
 private fun gainProcessor(v: Float): androidx.media3.common.audio.ChannelMixingAudioProcessor {
@@ -188,16 +228,21 @@ class EditorExporter(private val context: Context) {
                 afx.add(androidx.media3.common.audio.SonicAudioProcessor().apply { setSpeed(clip.speed) })
                 vfx.add(androidx.media3.effect.SpeedChangeEffect(clip.speed))
             }
-            if (project.transition == Transition.FADE && project.clips.size > 1) {
-                // Fade each clip in/out of black at its edges (added after speed so it
-                // works in the clip's output timeline).
-                vfx.add(
-                    androidx.media3.effect.OverlayEffect(
-                        com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(
-                            FadeOverlay(clip.outMs * 1000L)
+            if (project.clips.size > 1) {
+                // Edge transition in the clip's own output timeline (added after speed).
+                val clipUs = clip.outMs * 1000L
+                when (project.transition) {
+                    Transition.FADE -> vfx.add(
+                        androidx.media3.effect.OverlayEffect(
+                            com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(
+                                FadeOverlay(clipUs)
+                            )
                         )
                     )
-                )
+                    Transition.SLIDE -> vfx.add(SlideTransition(clipUs))
+                    Transition.ZOOM -> vfx.add(ZoomTransition(clipUs))
+                    Transition.NONE -> {}
+                }
             }
             val builder = EditedMediaItem.Builder(item).setRemoveAudio(clip.muted)
             if (vfx.isNotEmpty() || afx.isNotEmpty()) {
