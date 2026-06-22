@@ -5,6 +5,12 @@
          user-configured URL. After that the LLM runs fully offline on the
          tablet. Photos are picked via the photo picker (no storage perm). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Foreground service so a large model keeps downloading while the app is in the
+         background (data-sync type = a user-initiated network transfer). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Show the download-progress notification (runtime-requested on Android 13+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="false"
@@ -25,5 +31,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".thumb.ModelDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

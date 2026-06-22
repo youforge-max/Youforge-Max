@@ -104,23 +104,46 @@ class ModelManager(context: Context) {
             val dest = fileFor(slug, format)
             val tmp = File(modelsDir, "$slug.part")
             try {
+                // Resume: if a partial exists, ask the server for the rest via a Range header.
+                var existing = if (tmp.exists()) tmp.length() else 0L
                 val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                     connectTimeout = 30_000
                     readTimeout = 60_000
                     instanceFollowRedirects = true
+                    if (existing > 0) setRequestProperty("Range", "bytes=$existing-")
                 }
                 conn.connect()
-                if (conn.responseCode !in 200..299) {
-                    return@withContext Result.failure(Exception("HTTP ${conn.responseCode}"))
+                val code = conn.responseCode
+                val resuming = code == 206                 // server honoured the Range
+                if (code == 200) { existing = 0L; tmp.delete() } // server ignored Range → full restart
+                else if (code != 206 && code != 416 && code !in 200..299) {
+                    // Keep .part on a non-fatal server hiccup so the next run can resume.
+                    return@withContext Result.failure(Exception("HTTP $code"))
                 }
-                val total = conn.contentLengthLong
+
                 val digest = expectedSha256?.let { MessageDigest.getInstance("SHA-256") }
-                tmp.delete()
+
+                if (code == 416) {
+                    // Requested range past EOF — the partial is (probably) already complete.
+                    // Finalise it: verify (re-hash the whole file) and move into place.
+                    return@withContext finalise(tmp, dest, slug, format, expectedSha256, onProgress)
+                }
+
+                // Seed the hash with the bytes already on disk when truly resuming.
+                if (digest != null && resuming && existing > 0) {
+                    tmp.inputStream().use { ins ->
+                        val b = ByteArray(1 shl 16); var r: Int
+                        while (ins.read(b).also { r = it } != -1) digest.update(b, 0, r)
+                    }
+                }
+
+                val remaining = conn.contentLengthLong
+                val total = if (resuming && remaining > 0) existing + remaining else remaining
                 conn.inputStream.use { input ->
-                    tmp.outputStream().use { output ->
+                    java.io.FileOutputStream(tmp, /* append = */ resuming).use { output ->
                         val buf = ByteArray(1 shl 16)
                         var read: Int
-                        var done = 0L
+                        var done = existing
                         var lastPct = -1
                         while (input.read(buf).also { read = it } != -1) {
                             output.write(buf, 0, read)
@@ -142,28 +165,51 @@ class ModelManager(context: Context) {
                 if (digest != null) {
                     val got = digest.digest().joinToString("") { "%02x".format(it) }
                     if (!got.equals(expectedSha256, ignoreCase = true)) {
-                        tmp.delete()
+                        tmp.delete()   // corrupt — drop it so the next attempt starts clean
                         return@withContext Result.failure(
                             Exception("Checksum mismatch — file rejected")
                         )
                     }
                 }
-                dest.delete()
-                if (!tmp.renameTo(dest)) {
-                    tmp.delete()
-                    return@withContext Result.failure(Exception("Could not move model into place"))
-                }
-                // Drop any other-format file for this slug so the active format is unambiguous.
-                ModelFormat.values().filter { it != format }
-                    .forEach { File(modelsDir, "$slug.${it.ext}").delete() }
-                setActive(slug)
+                moveIntoPlace(tmp, dest, slug, format)
                 onProgress(1f)
                 Result.success(Unit)
             } catch (e: Exception) {
-                tmp.delete()
+                // Network error mid-stream: keep .part so a retry resumes from where it stopped.
                 Result.failure(e)
             }
         }
+
+    /** Verify an already-complete [tmp] (re-hash whole file) and move it into [dest]. */
+    private fun finalise(
+        tmp: File, dest: File, slug: String, format: ModelFormat,
+        expectedSha256: String?, onProgress: (Float) -> Unit
+    ): Result<Unit> {
+        if (tmp.length() < MIN_BYTES) { tmp.delete(); return Result.failure(Exception("Partial too small")) }
+        if (expectedSha256 != null) {
+            val md = MessageDigest.getInstance("SHA-256")
+            tmp.inputStream().use { ins ->
+                val b = ByteArray(1 shl 16); var r: Int
+                while (ins.read(b).also { r = it } != -1) md.update(b, 0, r)
+            }
+            val got = md.digest().joinToString("") { "%02x".format(it) }
+            if (!got.equals(expectedSha256, ignoreCase = true)) {
+                tmp.delete(); return Result.failure(Exception("Checksum mismatch — file rejected"))
+            }
+        }
+        moveIntoPlace(tmp, dest, slug, format)
+        onProgress(1f)
+        return Result.success(Unit)
+    }
+
+    private fun moveIntoPlace(tmp: File, dest: File, slug: String, format: ModelFormat) {
+        dest.delete()
+        if (!tmp.renameTo(dest)) { tmp.delete(); throw Exception("Could not move model into place") }
+        // Drop any other-format file for this slug so the active format is unambiguous.
+        ModelFormat.values().filter { it != format }
+            .forEach { File(modelsDir, "$slug.${it.ext}").delete() }
+        setActive(slug)
+    }
 
     /**
      * Download every suggested (ungated) model not already present, sequentially.

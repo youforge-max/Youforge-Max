@@ -880,13 +880,36 @@ private fun ModelDialog(
 ) {
     val context = LocalContext.current
     val scope = (context as ComponentActivity).lifecycleScope
+    // Downloads run in a foreground service (survive backgrounding); this dialog only
+    // observes the shared status + drives the buttons.
+    val dl by ModelDownloads.state.collectAsState()
     var url by remember { mutableStateOf(settings.modelUrl) }
-    var busy by remember { mutableStateOf(false) }       // a download/import is running
-    var curSlug by remember { mutableStateOf("") }       // which row is downloading
-    var progress by remember { mutableStateOf<Float?>(null) }
-    var refresh by remember { mutableStateOf(0) }        // bump to recompute installed/active
+    var importing by remember { mutableStateOf(false) }   // local .task import (no service)
+    var refresh by remember { mutableStateOf(0) }         // bump to recompute installed/active
     var msg by remember {
         mutableStateOf(if (modelMgr.isPresent()) "Model ready (offline)." else "No model yet — tap one below.")
+    }
+
+    val busy = dl.running || importing
+    val curSlug = if (importing) ModelManager.IMPORTED_SLUG else if (dl.running) dl.slug else ""
+    val progress: Float? = when { importing -> -1f; dl.running -> dl.progress; else -> null }
+
+    // Mirror the service's status into the message line, and react when a run ends.
+    LaunchedEffect(dl.message) { if (dl.message.isNotBlank()) msg = dl.message }
+    LaunchedEffect(dl.finishedAt) {
+        if (dl.finishedAt != 0L) { refresh++; onReadyChange(modelMgr.isPresent()) }
+    }
+
+    // Progress notification is runtime-permissioned on Android 13+; the service still runs
+    // without it (the notification just won't show), so we fire-and-forget the request.
+    val notifPerm = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+    fun requestNotifIfNeeded() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) notifPerm.launch(android.Manifest.permission.POST_NOTIFICATIONS)
     }
 
     fun startDownload(
@@ -894,30 +917,14 @@ private fun ModelDialog(
         sha256: String? = null, format: ModelFormat = ModelFormat.TASK
     ) {
         if (busy) return
-        busy = true; curSlug = slug; progress = 0f; msg = "Downloading $name…"
-        scope.launch {
-            val res = modelMgr.download(slug, dlUrl, sha256, format) { p -> progress = p }
-            busy = false; progress = null; curSlug = ""; refresh++
-            msg = if (res.isSuccess) "Installed $name — now active."
-            else "Failed: ${res.exceptionOrNull()?.message}"
-            onReadyChange(modelMgr.isPresent())
-        }
+        requestNotifIfNeeded()
+        ModelDownloadService.one(context, slug, name, dlUrl, sha256, format)
     }
 
     fun startAll() {
         if (busy) return
-        busy = true; curSlug = "all"; progress = -1f; msg = "Downloading all…"
-        scope.launch {
-            val res = modelMgr.downloadAll { name, idx, count, p ->
-                progress = p; msg = "[$idx/$count] $name…"
-            }
-            busy = false; progress = null; curSlug = ""; refresh++
-            msg = res.fold(
-                { if (it == 0) "All already installed." else "Done — $it model(s) installed." },
-                { "Some failed: ${it.message}" }
-            )
-            onReadyChange(modelMgr.isPresent())
-        }
+        requestNotifIfNeeded()
+        ModelDownloadService.all(context)
     }
 
     // Pick a .task already on the device (e.g. in Downloads) — no re-download.
@@ -925,10 +932,10 @@ private fun ModelDialog(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri == null || busy) return@rememberLauncherForActivityResult
-        busy = true; curSlug = ModelManager.IMPORTED_SLUG; progress = -1f; msg = "Importing local model…"
+        importing = true; msg = "Importing local model…"
         scope.launch {
             val res = modelMgr.importFromFile(uri)
-            busy = false; progress = null; curSlug = ""; refresh++
+            importing = false; refresh++
             msg = if (res.isSuccess) "Imported — now active."
             else "Import failed: ${res.exceptionOrNull()?.message}"
             onReadyChange(modelMgr.isPresent())
