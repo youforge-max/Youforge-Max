@@ -81,18 +81,45 @@ private fun stickerBitmap(s: Sticker): android.graphics.Bitmap {
     return bmp
 }
 
-/** Sticker overlays for the whole timeline, anchored on the output canvas. */
+/**
+ * A sticker overlay that only shows within [startUs]..[endUs] of the output timeline —
+ * alpha is 1 inside the window, 0 outside (per-sticker timing). The anchor is fixed.
+ */
+@UnstableApi
+private class TimedSticker(
+    private val bmp: android.graphics.Bitmap,
+    anchorX: Float, anchorY: Float,
+    private val startUs: Long, private val endUs: Long,
+) : androidx.media3.effect.BitmapOverlay() {
+    private val visible = androidx.media3.effect.OverlaySettings.Builder()
+        .setBackgroundFrameAnchor(anchorX, anchorY).setAlphaScale(1f).build()
+    private val hidden = androidx.media3.effect.OverlaySettings.Builder()
+        .setBackgroundFrameAnchor(anchorX, anchorY).setAlphaScale(0f).build()
+    override fun getBitmap(presentationTimeUs: Long) = bmp
+    override fun getOverlaySettings(presentationTimeUs: Long) =
+        if (presentationTimeUs in startUs..endUs) visible else hidden
+}
+
+/** Sticker overlays anchored on the output canvas, each gated by its own timing. */
 @OptIn(UnstableApi::class)
 fun stickerOverlayEffect(stickers: List<Sticker>): Effect? {
-    if (stickers.isEmpty()) return null
-    val overlays = stickers.filter { it.text.isNotBlank() }.map { s ->
+    val visible = stickers.filter { it.text.isNotBlank() }
+    if (visible.isEmpty()) return null
+    val overlays = visible.map { s ->
         // NDC anchor: x in [0,1] -> [-1,1]; y top-left -> NDC y up.
-        val settings = androidx.media3.effect.OverlaySettings.Builder()
-            .setBackgroundFrameAnchor(s.x * 2f - 1f, (1f - s.y) * 2f - 1f)
-            .build()
-        androidx.media3.effect.BitmapOverlay.createStaticBitmapOverlay(stickerBitmap(s), settings)
+        val ax = s.x * 2f - 1f
+        val ay = (1f - s.y) * 2f - 1f
+        val bmp = stickerBitmap(s)
+        if (s.startMs <= 0L && s.endMs < 0L) {
+            // Always-on: cheaper static overlay.
+            val settings = androidx.media3.effect.OverlaySettings.Builder()
+                .setBackgroundFrameAnchor(ax, ay).build()
+            androidx.media3.effect.BitmapOverlay.createStaticBitmapOverlay(bmp, settings)
+        } else {
+            val endUs = if (s.endMs < 0L) Long.MAX_VALUE else s.endMs * 1000L
+            TimedSticker(bmp, ax, ay, s.startMs * 1000L, endUs)
+        }
     }
-    if (overlays.isEmpty()) return null
     return androidx.media3.effect.OverlayEffect(
         com.google.common.collect.ImmutableList.copyOf(overlays.map { it as androidx.media3.effect.TextureOverlay })
     )
@@ -196,9 +223,11 @@ class EditorExporter(private val context: Context) {
             val h = project.resolution.height
             var w = Math.round(h.toFloat() * project.aspect.w / project.aspect.h)
             if (w % 2 != 0) w += 1
-            Presentation.createForWidthAndHeight(
-                w, h, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
-            )
+            // Letterbox = fit the whole frame inside the canvas (black bars); otherwise
+            // crop-fill so the canvas is fully covered.
+            val layout = if (project.letterbox) Presentation.LAYOUT_SCALE_TO_FIT
+                else Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
+            Presentation.createForWidthAndHeight(w, h, layout)
         }
         val videoEffects: MutableList<Effect> = mutableListOf(presentation)
         videoEffects.addAll(EditorEffects.forFilter(project.filter))

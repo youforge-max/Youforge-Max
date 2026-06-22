@@ -52,13 +52,16 @@ enum class AspectRatio(val label: String, val w: Int, val h: Int) {
 
 /**
  * A burned-in sticker: [text] (emoji or short text) drawn at normalised position
- * [x]/[y] in [0,1] (top-left origin), [sizePx] tall on the output canvas.
+ * [x]/[y] in [0,1] (top-left origin), [sizePx] tall on the output canvas. [startMs]/
+ * [endMs] gate when it is visible on the output timeline ([endMs] < 0 = until the end).
  */
 data class Sticker(
     val text: String,
     val x: Float = 0.5f,
     val y: Float = 0.5f,
     val sizePx: Int = 140,
+    val startMs: Long = 0L,
+    val endMs: Long = -1L,
 )
 
 /** The whole edit: an ordered list of clips rendered head-to-tail. */
@@ -71,6 +74,8 @@ data class EditorProject(
     val transition: Transition = Transition.NONE,
     val aspect: AspectRatio = AspectRatio.SOURCE,
     val stickers: List<Sticker> = emptyList(),
+    /** For a non-SOURCE [aspect]: true = letterbox (fit + black bars), false = crop-fill. */
+    val letterbox: Boolean = false,
 ) {
     val totalOutMs: Long get() = clips.sumOf { it.outMs }
     val isEmpty: Boolean get() = clips.isEmpty()

@@ -128,7 +128,7 @@ fun VideoEditorScreen() {
             AndroidView(
                 factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } },
                 update = { view ->
-                    view.resizeMode = if (a == AspectRatio.SOURCE)
+                    view.resizeMode = if (a == AspectRatio.SOURCE || project.letterbox)
                         AspectRatioFrameLayout.RESIZE_MODE_FIT
                     else AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                 },
@@ -251,6 +251,13 @@ fun VideoEditorScreen() {
                     enabled = !exporting
                 )
             }
+            // Letterbox vs crop-fill (only meaningful for a non-source aspect).
+            if (project.aspect != AspectRatio.SOURCE) FilterChip(
+                selected = project.letterbox,
+                onClick = { edit(project.copy(letterbox = !project.letterbox)) },
+                label = { Text("Letterbox") },
+                enabled = !exporting
+            )
         }
 
         // Stickers (emoji / short text burned onto the output canvas)
@@ -280,15 +287,53 @@ fun VideoEditorScreen() {
                 enabled = !exporting
             ) { Text("Clear (${project.stickers.size})") }
         }
-        // Position sliders for the selected sticker
+        // Select an existing sticker to edit (position / timing / delete).
+        if (project.stickers.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            project.stickers.forEachIndexed { i, s ->
+                FilterChip(
+                    selected = stickerSel == i,
+                    onClick = { stickerSel = i },
+                    label = { Text(s.text.take(8)) },
+                    enabled = !exporting
+                )
+            }
+        }
+        // Position + timing for the selected sticker
         project.stickers.getOrNull(stickerSel)?.let { st ->
+            fun update(s: Sticker) {
+                project = project.copy(stickers = project.stickers.toMutableList().also { it[stickerSel] = s })
+            }
             Text("Sticker “${st.text}” position", fontSize = 13.sp)
-            Slider(value = st.x, onValueChange = { x ->
-                project = project.copy(stickers = project.stickers.toMutableList().also { it[stickerSel] = st.copy(x = x) })
-            }, valueRange = 0f..1f, enabled = !exporting)
-            Slider(value = st.y, onValueChange = { y ->
-                project = project.copy(stickers = project.stickers.toMutableList().also { it[stickerSel] = st.copy(y = y) })
-            }, valueRange = 0f..1f, enabled = !exporting)
+            Slider(value = st.x, onValueChange = { update(st.copy(x = it)) }, valueRange = 0f..1f, enabled = !exporting)
+            Slider(value = st.y, onValueChange = { update(st.copy(y = it)) }, valueRange = 0f..1f, enabled = !exporting)
+            // Per-sticker timing (when there's a timeline to place it on)
+            val total = project.totalOutMs
+            if (total > 0L) {
+                val endShown = if (st.endMs < 0L) total else st.endMs
+                Text("Show ${fmt(st.startMs)} → ${fmt(endShown)}", fontSize = 13.sp)
+                Slider(
+                    value = st.startMs.coerceIn(0L, total).toFloat(),
+                    onValueChange = { update(st.copy(startMs = it.toLong().coerceAtMost(endShown - 100))) },
+                    valueRange = 0f..total.toFloat(), enabled = !exporting
+                )
+                Slider(
+                    value = endShown.coerceIn(0L, total).toFloat(),
+                    onValueChange = { v ->
+                        // Dragging to the far end means "until the end" (-1).
+                        val end = if (v >= total.toFloat() - 50f) -1L else v.toLong().coerceAtLeast(st.startMs + 100)
+                        update(st.copy(endMs = end))
+                    },
+                    valueRange = 0f..total.toFloat(), enabled = !exporting
+                )
+            }
+            TextButton(
+                onClick = {
+                    val list = project.stickers.toMutableList().also { it.removeAt(stickerSel) }
+                    edit(project.copy(stickers = list))
+                    stickerSel = (stickerSel - 1).coerceIn(-1, list.size - 1)
+                },
+                enabled = !exporting
+            ) { Text("Delete sticker") }
         }
 
         // Trim panel for the selected clip
@@ -405,12 +450,12 @@ private fun TrimPanel(clip: Clip, onChange: (Clip) -> Unit) {
 private fun saveProject(context: android.content.Context, p: EditorProject) {
     fun enc(s: String) = android.util.Base64.encodeToString(s.toByteArray(), android.util.Base64.NO_WRAP)
     val sb = StringBuilder()
-    sb.append("v4|${p.resolution.name}|${enc(p.title)}|${p.musicUri?.let { enc(it.toString()) } ?: ""}|${p.filter.name}|${p.transition.name}|${p.aspect.name}\n")
+    sb.append("v5|${p.resolution.name}|${enc(p.title)}|${p.musicUri?.let { enc(it.toString()) } ?: ""}|${p.filter.name}|${p.transition.name}|${p.aspect.name}|${p.letterbox}\n")
     p.clips.forEach { c ->
         sb.append("${enc(c.uri.toString())}|${c.durationMs}|${c.trimStartMs}|${c.trimEndMs}|${c.speed}|${c.muted}|${c.volume}|${c.rotationDeg}\n")
     }
     p.stickers.forEach { s ->
-        sb.append("S|${enc(s.text)}|${s.x}|${s.y}|${s.sizePx}\n")
+        sb.append("S|${enc(s.text)}|${s.x}|${s.y}|${s.sizePx}|${s.startMs}|${s.endMs}\n")
     }
     java.io.File(context.filesDir, "yf_project.txt").writeText(sb.toString())
 }
@@ -433,11 +478,17 @@ private fun loadProject(context: android.content.Context): EditorProject? {
         }
         val stickers = body.filter { it.startsWith("S|") }.mapNotNull { ln ->
             val s = ln.split("|")
-            runCatching { Sticker(dec(s[1]), s[2].toFloat(), s[3].toFloat(), s[4].toInt()) }.getOrNull()
+            runCatching {
+                Sticker(
+                    dec(s[1]), s[2].toFloat(), s[3].toFloat(), s[4].toInt(),
+                    s.getOrNull(5)?.toLongOrNull() ?: 0L, s.getOrNull(6)?.toLongOrNull() ?: -1L
+                )
+            }.getOrNull()
         }
         val transition = m.getOrNull(5)?.let { runCatching { Transition.valueOf(it) }.getOrNull() } ?: Transition.NONE
         val aspect = m.getOrNull(6)?.let { runCatching { AspectRatio.valueOf(it) }.getOrNull() } ?: AspectRatio.SOURCE
-        EditorProject(clips, ExportResolution.valueOf(m[1]), dec(m[2]), music, VideoFilter.valueOf(m[4]), transition, aspect, stickers)
+        val letterbox = m.getOrNull(7)?.toBoolean() ?: false
+        EditorProject(clips, ExportResolution.valueOf(m[1]), dec(m[2]), music, VideoFilter.valueOf(m[4]), transition, aspect, stickers, letterbox)
     }.getOrNull()
 }
 

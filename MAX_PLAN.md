@@ -60,7 +60,12 @@ things YouForge already has: the **Compose UI** and the **overlay renderer + aud
   - **Redo** — second stack mirroring undo; `edit()` clears redo.
   - **Live aspect-crop preview** — `PlayerView` shaped to the chosen ratio + `RESIZE_MODE_ZOOM` (crop-fill); Source = `RESIZE_MODE_FIT`.
   - Project save/load bumped to v4 (clip volume+rotation, sticker lines `S|…`). versionName `1.1-max-p8`, versionCode 20.
-- **Remaining backlog:** slide/zoom transitions, per-sticker selection/drag, sticker timing (per-clip), aspect ratios on non-crop (letterbox) mode.
+- **Backlog cleared (DONE, p9):**
+  - **Letterbox aspect** — non-SOURCE ratios get a Letterbox toggle: `Presentation.LAYOUT_SCALE_TO_FIT` (black bars) vs crop-fill; preview honours it via `RESIZE_MODE_FIT`.
+  - **Per-sticker select/delete** — chip row selects any existing sticker (was only on-add); per-sticker Delete button.
+  - **Per-sticker timing** — `Sticker.startMs/endMs` (−1 = until end); export uses a `TimedSticker` `BitmapOverlay` that alpha-gates by output-timeline `presentationTimeUs`; start/end sliders in the sticker panel.
+  - Project save/load bumped to v5 (header `letterbox`, sticker lines `S|…|startMs|endMs`); v4/older still load.
+- **Remaining backlog:** slide/zoom transitions (deferred — Media3 1.4.1 stock effects are static; true crossfade/slide needs overlapping compositing or a custom animated GL shader), per-sticker drag (sliders only for now).
 
 ## Notes / risks
 
