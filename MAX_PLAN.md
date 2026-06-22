@@ -66,7 +66,8 @@ things YouForge already has: the **Compose UI** and the **overlay renderer + aud
   - **Per-sticker timing** — `Sticker.startMs/endMs` (−1 = until end); export uses a `TimedSticker` `BitmapOverlay` that alpha-gates by output-timeline `presentationTimeUs`; start/end sliders in the sticker panel.
   - Project save/load bumped to v5 (header `letterbox`, sticker lines `S|…|startMs|endMs`); v4/older still load.
 - **Slide/zoom transitions (DONE, p10):** `MatrixTransformation` (time-varying 2D matrix in NDC, clip-local timeline) — `SlideTransition` translates the frame in from left / out to right over black; `ZoomTransition` punch-zooms in at the start and out at the end (scale about centre). Wired alongside FADE in a `when` on `project.transition`; chips auto-populate from the enum. versionName `1.1-max-p10`, versionCode 22.
-- **Remaining backlog:** true crossfade between clips (needs overlapping compositing — Media3 sequences are head-to-tail, out of scope), per-sticker drag (sliders only for now).
+- **Per-sticker drag (DONE, p11):** stickers now render in the live preview (were export-only) and each is draggable to reposition — drag updates normalised x/y (also selects it); sliders still work. Preview maps `sizePx` (720-canvas-relative) to preview height. versionName `1.1-max-p11`, versionCode 23.
+- **Remaining backlog:** true crossfade between clips — **blocked on Media3 1.4.1**: `EditedMediaItemSequence` has no gap API (verified via `javap`), so overlapping two tracks needs transparent-spacer clips and alternating-track A/B-roll, whose blend order breaks for 3+ clips (incoming clip lands on the bottom track, can't dissolve over the top). Needs a Media3 upgrade or a dedicated device-tested effort.
 
 ## Notes / risks
 

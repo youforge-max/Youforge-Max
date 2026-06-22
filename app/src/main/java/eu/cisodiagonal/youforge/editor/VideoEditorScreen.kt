@@ -6,6 +6,8 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,15 +18,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlin.math.roundToInt
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -58,6 +67,9 @@ fun VideoEditorScreen() {
 
     var stickerText by remember { mutableStateOf("") }
     var stickerSel by remember { mutableIntStateOf(-1) }
+    // Pixel size of the preview area — used to map normalised sticker x/y for drag.
+    var previewSize by remember { mutableStateOf(IntSize.Zero) }
+    val density = LocalDensity.current
 
     // ExoPlayer for the preview; released when the screen leaves composition.
     val player = remember {
@@ -121,7 +133,10 @@ fun VideoEditorScreen() {
 
         // Preview — for a chosen aspect the view is shaped to that ratio and the video
         // is zoom-cropped to fill it, approximating the export crop. Source = fit.
-        Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.fillMaxWidth().height(240.dp).onSizeChanged { previewSize = it },
+            contentAlignment = Alignment.Center
+        ) {
             val a = project.aspect
             val viewMod = if (a == AspectRatio.SOURCE) Modifier.fillMaxSize()
                 else Modifier.fillMaxHeight().aspectRatio(a.w.toFloat() / a.h.toFloat())
@@ -134,6 +149,39 @@ fun VideoEditorScreen() {
                 },
                 modifier = viewMod
             )
+            // Draggable sticker overlays — drag to reposition; a drag also selects it.
+            // sizePx is relative to a 720-tall canvas (see EditorExporter); scale to preview.
+            if (previewSize.width > 0) project.stickers.forEachIndexed { i, s ->
+                if (s.text.isBlank()) return@forEachIndexed
+                val fontSp = with(density) { (s.sizePx / 720f * previewSize.height).toSp() }
+                var sz by remember(i) { mutableStateOf(IntSize.Zero) }
+                Text(
+                    s.text,
+                    color = Color.White,
+                    fontSize = fontSp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .onSizeChanged { sz = it }
+                        .offset {
+                            IntOffset(
+                                (s.x * previewSize.width - sz.width / 2f).roundToInt(),
+                                (s.y * previewSize.height - sz.height / 2f).roundToInt()
+                            )
+                        }
+                        .then(if (i == stickerSel) Modifier.background(Color(0x3300E5FF)) else Modifier)
+                        .pointerInput(i, previewSize) {
+                            detectDragGestures(onDragStart = { stickerSel = i }) { change, drag ->
+                                change.consume()
+                                val cur = project.stickers.getOrNull(i) ?: return@detectDragGestures
+                                val nx = (cur.x + drag.x / previewSize.width).coerceIn(0f, 1f)
+                                val ny = (cur.y + drag.y / previewSize.height).coerceIn(0f, 1f)
+                                project = project.copy(
+                                    stickers = project.stickers.toMutableList().also { it[i] = cur.copy(x = nx, y = ny) }
+                                )
+                            }
+                        }
+                )
+            }
         }
 
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
