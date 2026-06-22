@@ -346,8 +346,13 @@ class EditorExporter(private val context: Context) {
             run { var sum = 0L; for (k in 0 until n) { startUs[k] = sum - k.toLong() * xUs; sum += dUs[k] } }
             val total = startUs[n - 1] + dUs[n - 1]
 
+            // Force tracks so the leading/interior gaps render as blank video (and silent
+            // audio) rather than being inferred — required when a sequence starts with a gap
+            // (the top/odd track does).
             val even = androidx.media3.transformer.EditedMediaItemSequence.Builder()
+                .experimentalSetForceVideoTrack(true).experimentalSetForceAudioTrack(true)
             val odd = androidx.media3.transformer.EditedMediaItemSequence.Builder()
+                .experimentalSetForceVideoTrack(true).experimentalSetForceAudioTrack(true)
             var prevEven = 0L
             var prevOdd = 0L
             for (k in 0 until n) {

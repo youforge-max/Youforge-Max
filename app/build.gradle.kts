@@ -6,14 +6,14 @@ plugins {
 
 android {
     namespace = "eu.cisodiagonal.youforge"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "eu.cisodiagonal.youforge"
         minSdk = 29              // MediaPipe GenAI runs on 24+; SAF + Compose fine on 29
         targetSdk = 35
-        versionCode = 24
-        versionName = "1.1-max-p12"
+        versionCode = 25
+        versionName = "1.1-max-p13"
 
         // Tablet is arm64; drop the other ABIs' native libs to slim the APK.
         ndk { abiFilters += "arm64-v8a" }
@@ -115,9 +115,9 @@ dependencies {
     // Video editor engine (YouForge Max): Media3 Transformer/Composition — on-device,
     // MediaCodec-based trim/merge/speed/effects/overlays, no FFmpeg, no watermark.
     // ExoPlayer + media3-ui drive the editor's live preview.
-    implementation("androidx.media3:media3-transformer:1.7.1")
-    implementation("androidx.media3:media3-effect:1.7.1")
-    implementation("androidx.media3:media3-common:1.7.1")
-    implementation("androidx.media3:media3-exoplayer:1.7.1")
-    implementation("androidx.media3:media3-ui:1.7.1")
+    implementation("androidx.media3:media3-transformer:1.8.1")
+    implementation("androidx.media3:media3-effect:1.8.1")
+    implementation("androidx.media3:media3-common:1.8.1")
+    implementation("androidx.media3:media3-exoplayer:1.8.1")
+    implementation("androidx.media3:media3-ui:1.8.1")
 }
