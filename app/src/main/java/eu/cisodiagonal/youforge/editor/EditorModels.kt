@@ -35,10 +35,11 @@ enum class VideoFilter(val label: String) {
 /**
  * Transition at each clip's edges (applied in the clip's own output timeline).
  * FADE = fade in/out of black; SLIDE = slide in from left / out to right over black;
- * ZOOM = punch-zoom in at the start and out at the end.
+ * ZOOM = punch-zoom in at the start and out at the end; CROSSFADE = true dissolve between
+ * consecutive clips (two overlapping sequences, alpha-ramped).
  */
 enum class Transition(val label: String) {
-    NONE("None"), FADE("Fade"), SLIDE("Slide"), ZOOM("Zoom");
+    NONE("None"), FADE("Fade"), SLIDE("Slide"), ZOOM("Zoom"), CROSSFADE("Crossfade");
 }
 
 /**

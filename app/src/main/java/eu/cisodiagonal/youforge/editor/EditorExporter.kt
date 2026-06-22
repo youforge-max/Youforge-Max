@@ -38,11 +38,11 @@ private class FadeOverlay(private val clipUs: Long) : androidx.media3.effect.Bit
     private val black = android.graphics.Bitmap
         .createBitmap(8, 8, android.graphics.Bitmap.Config.ARGB_8888)
         .apply { eraseColor(android.graphics.Color.BLACK) }
-    private val cover = androidx.media3.effect.OverlaySettings.Builder().setScale(1000f, 1000f)
+    private val cover = androidx.media3.effect.StaticOverlaySettings.Builder().setScale(1000f, 1000f)
 
     override fun getBitmap(presentationTimeUs: Long) = black
 
-    override fun getOverlaySettings(presentationTimeUs: Long): androidx.media3.effect.OverlaySettings {
+    override fun getOverlaySettings(presentationTimeUs: Long): androidx.media3.common.OverlaySettings {
         val a = when {
             presentationTimeUs < fadeUs -> 1f - presentationTimeUs.toFloat() / fadeUs
             presentationTimeUs > clipUs - fadeUs -> (presentationTimeUs - (clipUs - fadeUs)).toFloat() / fadeUs
@@ -92,6 +92,79 @@ private class ZoomTransition(private val clipUs: Long) : androidx.media3.effect.
     }
 }
 
+/**
+ * Per-clip alpha ramp for a true cross-clip dissolve. Reuses Media3's own alpha-scale
+ * fragment shader (bundled in the media3-effect assets) and drives `uAlphaScale` from the
+ * clip's output-timeline timestamp: ramps in over the first [edgeUs] and out over the last
+ * [edgeUs] (each gated by [rampIn]/[rampOut]). Applied to the top sequence of the crossfade
+ * A/B-roll so it dissolves over the full-alpha bottom sequence.
+ */
+@UnstableApi
+private class RampAlphaShaderProgram(
+    context: Context, useHdr: Boolean,
+    private val clipUs: Long, private val edgeUs: Long,
+    private val rampIn: Boolean, private val rampOut: Boolean,
+) : androidx.media3.effect.BaseGlShaderProgram(useHdr, 1) {
+    private val glProgram = androidx.media3.common.util.GlProgram(
+        context,
+        "shaders/vertex_shader_transformation_es2.glsl",
+        "shaders/fragment_shader_alpha_scale_es2.glsl",
+    ).apply {
+        val identity = androidx.media3.common.util.GlUtil.create4x4IdentityMatrix()
+        setFloatsUniform("uTransformationMatrix", identity)
+        setFloatsUniform("uTexTransformationMatrix", identity)
+        setBufferAttribute(
+            "aFramePosition",
+            androidx.media3.common.util.GlUtil.getNormalizedCoordinateBounds(),
+            androidx.media3.common.util.GlUtil.HOMOGENEOUS_COORDINATE_VECTOR_SIZE,
+        )
+    }
+
+    override fun configure(inputWidth: Int, inputHeight: Int) =
+        androidx.media3.common.util.Size(inputWidth, inputHeight)
+
+    override fun drawFrame(inputTexId: Int, presentationTimeUs: Long) {
+        try {
+            glProgram.use()
+            glProgram.setSamplerTexIdUniform("uTexSampler", inputTexId, /* texUnitIndex= */ 0)
+            glProgram.setFloatUniform("uAlphaScale", alphaAt(presentationTimeUs))
+            glProgram.bindAttributesAndUniforms()
+            android.opengl.GLES20.glDrawArrays(android.opengl.GLES20.GL_TRIANGLE_STRIP, 0, 4)
+            androidx.media3.common.util.GlUtil.checkGlError()
+        } catch (e: androidx.media3.common.util.GlUtil.GlException) {
+            throw androidx.media3.common.VideoFrameProcessingException(e, presentationTimeUs)
+        }
+    }
+
+    private fun alphaAt(t: Long): Float {
+        var a = 1f
+        if (rampIn && t < edgeUs) a = t.toFloat() / edgeUs
+        if (rampOut && t > clipUs - edgeUs) a = (clipUs - t).toFloat() / edgeUs
+        return a.coerceIn(0f, 1f)
+    }
+
+    override fun release() {
+        super.release()
+        try { glProgram.delete() } catch (_: androidx.media3.common.util.GlUtil.GlException) {}
+    }
+}
+
+/** GlEffect wrapper producing a [RampAlphaShaderProgram] for the crossfade A/B-roll. */
+@UnstableApi
+private class RampAlphaEffect(
+    private val clipUs: Long, private val edgeUs: Long,
+    private val rampIn: Boolean, private val rampOut: Boolean,
+) : androidx.media3.effect.GlEffect {
+    override fun toGlShaderProgram(context: Context, useHdr: Boolean): androidx.media3.effect.GlShaderProgram =
+        try {
+            RampAlphaShaderProgram(context, useHdr, clipUs, edgeUs, rampIn, rampOut)
+        } catch (e: java.io.IOException) {
+            throw androidx.media3.common.VideoFrameProcessingException(e)
+        } catch (e: androidx.media3.common.util.GlUtil.GlException) {
+            throw androidx.media3.common.VideoFrameProcessingException(e)
+        }
+}
+
 /** Audio gain via a channel-mixing identity matrix scaled by [v] (mono + stereo). */
 @OptIn(UnstableApi::class)
 private fun gainProcessor(v: Float): androidx.media3.common.audio.ChannelMixingAudioProcessor {
@@ -131,9 +204,9 @@ private class TimedSticker(
     anchorX: Float, anchorY: Float,
     private val startUs: Long, private val endUs: Long,
 ) : androidx.media3.effect.BitmapOverlay() {
-    private val visible = androidx.media3.effect.OverlaySettings.Builder()
+    private val visible = androidx.media3.effect.StaticOverlaySettings.Builder()
         .setBackgroundFrameAnchor(anchorX, anchorY).setAlphaScale(1f).build()
-    private val hidden = androidx.media3.effect.OverlaySettings.Builder()
+    private val hidden = androidx.media3.effect.StaticOverlaySettings.Builder()
         .setBackgroundFrameAnchor(anchorX, anchorY).setAlphaScale(0f).build()
     override fun getBitmap(presentationTimeUs: Long) = bmp
     override fun getOverlaySettings(presentationTimeUs: Long) =
@@ -152,7 +225,7 @@ fun stickerOverlayEffect(stickers: List<Sticker>): Effect? {
         val bmp = stickerBitmap(s)
         if (s.startMs <= 0L && s.endMs < 0L) {
             // Always-on: cheaper static overlay.
-            val settings = androidx.media3.effect.OverlaySettings.Builder()
+            val settings = androidx.media3.effect.StaticOverlaySettings.Builder()
                 .setBackgroundFrameAnchor(ax, ay).build()
             androidx.media3.effect.BitmapOverlay.createStaticBitmapOverlay(bmp, settings)
         } else {
@@ -202,7 +275,19 @@ class EditorExporter(private val context: Context) {
     }
 
     private fun startOnMain(project: EditorProject, callback: Callback) {
-        val editedItems = project.clips.map { clip ->
+        val n = project.clips.size
+        // True crossfade needs each clip long enough to host its overlap(s); clamp the
+        // crossfade duration to half the shortest clip (and cap it), else fall back to a cut.
+        val crossfade = project.transition == Transition.CROSSFADE && n > 1
+        val xUs: Long = if (crossfade) {
+            val capMs = (project.clips.minOf { it.outMs } / 2 - 100).coerceAtLeast(0)
+            minOf(800L, capMs) * 1000L
+        } else 0L
+        val doCrossfade = crossfade && xUs > 0L
+
+        // Build one clip into an EditedMediaItem with its base per-clip effects (trim,
+        // rotation, speed, volume, mute) plus any [extraVfx] (edge transition / alpha ramp).
+        fun baseItem(clip: Clip, extraVfx: List<Effect>): EditedMediaItem {
             val item = MediaItem.Builder()
                 .setUri(clip.uri)
                 .setClippingConfiguration(
@@ -228,32 +313,68 @@ class EditorExporter(private val context: Context) {
                 afx.add(androidx.media3.common.audio.SonicAudioProcessor().apply { setSpeed(clip.speed) })
                 vfx.add(androidx.media3.effect.SpeedChangeEffect(clip.speed))
             }
-            if (project.clips.size > 1) {
-                // Edge transition in the clip's own output timeline (added after speed).
-                val clipUs = clip.outMs * 1000L
-                when (project.transition) {
-                    Transition.FADE -> vfx.add(
-                        androidx.media3.effect.OverlayEffect(
-                            com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(
-                                FadeOverlay(clipUs)
-                            )
-                        )
-                    )
-                    Transition.SLIDE -> vfx.add(SlideTransition(clipUs))
-                    Transition.ZOOM -> vfx.add(ZoomTransition(clipUs))
-                    Transition.NONE -> {}
-                }
-            }
+            vfx.addAll(extraVfx)
             val builder = EditedMediaItem.Builder(item).setRemoveAudio(clip.muted)
             if (vfx.isNotEmpty() || afx.isNotEmpty()) {
                 builder.setEffects(androidx.media3.transformer.Effects(afx, vfx))
             }
-            builder.build()
+            return builder.build()
         }
-        val videoSequence = EditedMediaItemSequence(editedItems)
-        // Optional background music as a second (audio-only) sequence; the Composition
-        // mixes it with the clips' own audio. Truncated to the video length.
-        val sequences = mutableListOf(videoSequence)
+
+        // Per-clip edge transition (FADE/SLIDE/ZOOM) in the clip's own output timeline.
+        fun edgeEffect(clip: Clip): Effect? {
+            if (n <= 1) return null
+            val clipUs = clip.outMs * 1000L
+            return when (project.transition) {
+                Transition.FADE -> androidx.media3.effect.OverlayEffect(
+                    com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(FadeOverlay(clipUs))
+                )
+                Transition.SLIDE -> SlideTransition(clipUs)
+                Transition.ZOOM -> ZoomTransition(clipUs)
+                else -> null // NONE and CROSSFADE add no per-clip edge effect
+            }
+        }
+
+        val sequences = mutableListOf<EditedMediaItemSequence>()
+        if (doCrossfade) {
+            // A/B-roll dissolve: clips alternate between two video sequences that overlap by
+            // [xUs]. The top (odd-index) sequence ramps its alpha in/out so it dissolves over
+            // the full-alpha bottom (even-index) sequence — clean for both even->odd and
+            // odd->even cuts. The output timeline is compressed by xUs at each cut.
+            val dUs = LongArray(n) { project.clips[it].outMs * 1000L }
+            val startUs = LongArray(n)
+            run { var sum = 0L; for (k in 0 until n) { startUs[k] = sum - k.toLong() * xUs; sum += dUs[k] } }
+            val total = startUs[n - 1] + dUs[n - 1]
+
+            val even = androidx.media3.transformer.EditedMediaItemSequence.Builder()
+            val odd = androidx.media3.transformer.EditedMediaItemSequence.Builder()
+            var prevEven = 0L
+            var prevOdd = 0L
+            for (k in 0 until n) {
+                val endK = startUs[k] + dUs[k]
+                if (k % 2 == 0) {
+                    if (startUs[k] - prevEven > 0) even.addGap(startUs[k] - prevEven)
+                    even.addItem(baseItem(project.clips[k], emptyList())) // bottom: full alpha
+                    prevEven = endK
+                } else {
+                    if (startUs[k] - prevOdd > 0) odd.addGap(startUs[k] - prevOdd)
+                    // top: ramp in at start, ramp out at end (skip out-ramp on the final clip).
+                    odd.addItem(baseItem(project.clips[k], listOf(RampAlphaEffect(dUs[k], xUs, true, k < n - 1))))
+                    prevOdd = endK
+                }
+            }
+            // Pad the shorter track so neither truncates the composition length.
+            if (prevEven < total) even.addGap(total - prevEven)
+            if (prevOdd < total) odd.addGap(total - prevOdd)
+            sequences.add(even.build()) // primary = bottom
+            sequences.add(odd.build())  // secondary = top (alpha-ramped over the bottom)
+        } else {
+            sequences.add(
+                EditedMediaItemSequence(project.clips.map { baseItem(it, listOfNotNull(edgeEffect(it))) })
+            )
+        }
+        // Optional background music as a separate audio-only sequence; the Composition mixes
+        // it with the clips' own audio.
         project.musicUri?.let { music ->
             val musicItem = EditedMediaItem.Builder(MediaItem.fromUri(music)).build()
             sequences.add(EditedMediaItemSequence(listOf(musicItem)))
