@@ -68,8 +68,6 @@ data class SuggestedModel(
     val gated: Boolean = false,
     val sha256: String? = null,
     val format: ModelFormat = ModelFormat.TASK,
-    /** Included in "Download all". Large models default to false (tap to fetch individually). */
-    val inBulk: Boolean = true,
 )
 
 /**
@@ -132,15 +130,14 @@ object SuggestedModels {
         ),
         // --- Larger, stronger instruct models for sharper titles. The 0.5–1.5B models
         // above can write junk; these 2–3B models follow the "short punchy hook" prompt
-        // much better. All ungated (verified 302 → CDN, no login). Excluded from
-        // "Download all" (inBulk=false) since they're 1.7–2.1 GB each — tap to fetch.
+        // much better. All ungated (verified 302 → CDN, no login).
         SuggestedModel(
             "gguf-qwen2_5-3b", "Qwen2.5-3B-Instruct (GGUF)", "~2.1 GB",
             "GGUF · best quality · recommended · no login",
             "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/" +
                 "qwen2.5-3b-instruct-q4_k_m.gguf",
             sha256 = "626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d",
-            format = ModelFormat.GGUF, inBulk = false
+            format = ModelFormat.GGUF
         ),
         SuggestedModel(
             "gguf-llama3_2-3b", "Llama-3.2-3B-Instruct (GGUF)", "~2.0 GB",
@@ -148,7 +145,7 @@ object SuggestedModels {
             "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/" +
                 "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
             sha256 = "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff",
-            format = ModelFormat.GGUF, inBulk = false
+            format = ModelFormat.GGUF
         ),
         SuggestedModel(
             "gguf-gemma2-2b", "Gemma-2-2B-it (GGUF)", "~1.7 GB",
@@ -156,7 +153,7 @@ object SuggestedModels {
             "https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/" +
                 "gemma-2-2b-it-Q4_K_M.gguf",
             sha256 = "e0aee85060f168f0f2d8473d7ea41ce2f3230c1bc1374847505ea599288a7787",
-            format = ModelFormat.GGUF, inBulk = false
+            format = ModelFormat.GGUF
         )
     )
 

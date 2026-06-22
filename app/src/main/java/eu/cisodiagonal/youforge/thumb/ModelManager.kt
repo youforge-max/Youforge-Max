@@ -219,7 +219,7 @@ class ModelManager(context: Context) {
     suspend fun downloadAll(
         onModel: (name: String, index: Int, count: Int, progress: Float) -> Unit
     ): Result<Int> = withContext(Dispatchers.IO) {
-        val todo = SuggestedModels.all.filter { !it.gated && it.inBulk && !isPresent(it.slug) }
+        val todo = SuggestedModels.all.filter { !it.gated && !isPresent(it.slug) }
         if (todo.isEmpty()) return@withContext Result.success(0)
         var ok = 0
         todo.forEachIndexed { i, m ->

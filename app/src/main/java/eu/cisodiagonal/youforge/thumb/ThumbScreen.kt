@@ -945,7 +945,12 @@ private fun ModelDialog(
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
         confirmButton = {
-            TextButton(onClick = { startAll() }, enabled = !busy) { Text("Download all") }
+            val pending = remember(refresh) {
+                SuggestedModels.all.count { !it.gated && !modelMgr.isPresent(it.slug) }
+            }
+            TextButton(onClick = { startAll() }, enabled = !busy && pending > 0) {
+                Text(if (pending > 0) "Download all ($pending)" else "All installed")
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Close") } },
         title = { Text("On-device models") },
