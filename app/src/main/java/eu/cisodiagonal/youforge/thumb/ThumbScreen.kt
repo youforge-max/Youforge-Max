@@ -114,6 +114,80 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
 
     val voskMgr = remember { VoskModelManager(context) }
 
+    // "Pick a still from a video" — extract ~10 candidate frames the user can choose from
+    // (or shuffle for 10 new random ones). The chosen still becomes the thumbnail photo.
+    var stillsUri by remember { mutableStateOf<Uri?>(null) }
+    var stillsDurMs by remember { mutableStateOf(0L) }
+    var stillCandidates by remember { mutableStateOf<List<VideoStills.Still>>(emptyList()) }
+    var showStills by remember { mutableStateOf(false) }
+    var stillCount by remember { mutableStateOf(10) }
+    // Timestamp of the still currently used as the background (to mark it in the grid).
+    var chosenStillTimeUs by remember { mutableStateOf<Long?>(null) }
+
+    fun loadStills(random: Boolean) {
+        val uri = stillsUri ?: return
+        val total = stillCount
+        scope.launch {
+            busy = true
+            stillCandidates = emptyList()
+            showStills = true
+            status = "Grabbing stills 0/$total…"
+            try {
+                VideoStills.extractStreaming(context, uri, stillsDurMs, total, random) { i, tot, still ->
+                    if (still != null) stillCandidates = stillCandidates + still
+                    status = "Grabbing stills ${i + 1}/$tot…"
+                }
+                if (stillCandidates.isEmpty()) {
+                    status = "Couldn't read frames from that video."; showStills = false
+                } else {
+                    status = "Pick a still, or shuffle for new ones."
+                }
+            } finally { busy = false }
+        }
+    }
+
+    val stillsPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            busy = true
+            status = "Reading video…"
+            try {
+                val dur = withContext(Dispatchers.IO) { VideoStills.durationMs(context, uri) }
+                if (dur <= 0L) { status = "Couldn't read that video."; return@launch }
+                stillsUri = uri
+                stillsDurMs = dur
+            } finally { busy = false }
+            loadStills(random = false)
+        }
+    }
+
+    fun chooseStill(s: VideoStills.Still) {
+        scope.launch {
+            busy = true
+            status = "Loading still…"
+            try {
+                val full = withContext(Dispatchers.Default) {
+                    VideoStills.frameAt(
+                        context, stillsUri ?: return@withContext null,
+                        s.timeUs, ThumbnailRenderer.W, ThumbnailRenderer.H
+                    )
+                } ?: s.bmp
+                chosenStillTimeUs = s.timeUs
+                sourceBitmap = full
+                originalBitmap = full
+                spec = null
+                stickers = emptyList()
+                selectedId = null
+                titleSelected = false
+                rendered = ThumbnailRenderer.render(context, full, null, emptyList())
+                showStills = false
+                status = "Still chosen. Describe your thumbnail, then tap Suggest."
+            } finally { busy = false }
+        }
+    }
+
     fun generate(useAi: Boolean) {
         if (sourceBitmap == null) { status = "Pick a photo first."; return }
         if (description.isBlank()) { status = "Type a description first."; return }
@@ -320,6 +394,17 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
                 ) { Text("Template") }
             }
 
+            // Pick a still frame from a video as the thumbnail background.
+            OutlinedButton(
+                onClick = {
+                    stillsPicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                    )
+                },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("🎞  Pick a still from video") }
+
             // Generate a title from a video's speech (on-device transcription).
             OutlinedButton(
                 onClick = {
@@ -333,6 +418,68 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
 
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             Text(status, style = MaterialTheme.typography.bodySmall)
+
+            // Still picker — grid of candidate frames; tap one to use it, or shuffle 10 new.
+            if (showStills) AlertDialog(
+                onDismissRequest = { showStills = false },
+                confirmButton = {
+                    TextButton(onClick = { loadStills(random = true) }, enabled = !busy) {
+                        Text("🎲  $stillCount new")
+                    }
+                },
+                dismissButton = { TextButton(onClick = { showStills = false }) { Text("Close") } },
+                title = { Text("Pick a still") },
+                text = {
+                    Column(
+                        Modifier.verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // How many stills to offer.
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Count:", style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.align(Alignment.CenterVertically))
+                            listOf(6, 10, 16).forEach { c ->
+                                FilterChip(
+                                    selected = stillCount == c,
+                                    onClick = { if (!busy && c != stillCount) { stillCount = c; loadStills(random = false) } },
+                                    label = { Text("$c") },
+                                    enabled = !busy
+                                )
+                            }
+                        }
+                        stillCandidates.chunked(2).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                row.forEach { s ->
+                                    val isChosen = s.timeUs == chosenStillTimeUs
+                                    Column(
+                                        Modifier.weight(1f),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Image(
+                                            bitmap = s.bmp.asImageBitmap(),
+                                            contentDescription = "still",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .aspectRatio(16f / 9f)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .then(
+                                                    if (isChosen) Modifier.border(
+                                                        BorderStroke(3.dp, MaterialTheme.colorScheme.primary),
+                                                        RoundedCornerShape(8.dp)
+                                                    ) else Modifier
+                                                )
+                                                .clickable(enabled = !busy) { chooseStill(s) }
+                                        )
+                                        Text(fmtTimecode(s.timeUs), style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                                if (row.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            )
 
             // Photo tools — on-device MediaPipe (background removal + face framing).
             if (sourceBitmap != null) {
@@ -899,6 +1046,12 @@ private fun ModelDialog(
 }
 
 /* ---- helpers ---- */
+
+/** mm:ss for a still's source timestamp (µs). */
+private fun fmtTimecode(timeUs: Long): String {
+    val s = timeUs / 1_000_000
+    return "%d:%02d".format(s / 60, s % 60)
+}
 
 @Composable
 private fun rememberLauncherForPicker(onResult: (Uri?) -> Unit) =
