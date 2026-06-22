@@ -68,6 +68,8 @@ data class SuggestedModel(
     val gated: Boolean = false,
     val sha256: String? = null,
     val format: ModelFormat = ModelFormat.TASK,
+    /** Approx download size in MB (for the "Download all" size estimate). */
+    val approxMb: Int = 0,
 )
 
 /**
@@ -91,19 +93,19 @@ object SuggestedModels {
             "qwen2_5-1_5b", "Qwen2.5-1.5B-Instruct", "~1.6 GB", "Default · balanced · no login",
             "$BASE/Qwen2.5-1.5B-Instruct/resolve/main/" +
                 "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
-            sha256 = "8d867a7c93a6acf2892f08e0174e2f6f351ad256b7e3cfb6d6cd9c89794b42e0"
+            sha256 = "8d867a7c93a6acf2892f08e0174e2f6f351ad256b7e3cfb6d6cd9c89794b42e0", approxMb = 1600
         ),
         SuggestedModel(
             "qwen2_5-0_5b", "Qwen2.5-0.5B-Instruct", "~0.55 GB", "Tiny · fastest · no login",
             "$BASE/Qwen2.5-0.5B-Instruct/resolve/main/" +
                 "Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
-            sha256 = "e608953f169aeb1bd7b9155fec2559825e08453fc209b84eda3a781ed0452fd2"
+            sha256 = "e608953f169aeb1bd7b9155fec2559825e08453fc209b84eda3a781ed0452fd2", approxMb = 550
         ),
         SuggestedModel(
             "tinyllama-1_1b", "TinyLlama-1.1B-Chat", "~1.15 GB", "Small · snappy · no login",
             "$BASE/TinyLlama-1.1B-Chat-v1.0/resolve/main/" +
                 "TinyLlama-1.1B-Chat-v1.0_multi-prefill-seq_q8_ekv1280.task",
-            sha256 = "0f09dc7f792bb8d49b6629effaee3ed1a99e4506b082cd353471bdf391dee053"
+            sha256 = "0f09dc7f792bb8d49b6629effaee3ed1a99e4506b082cd353471bdf391dee053", approxMb = 1150
         )
         // NB: DeepSeek-R1-Distill is intentionally omitted — it is a reasoning
         // model that emits <think>…</think> spans, which derails the short-title
@@ -118,6 +120,7 @@ object SuggestedModels {
             "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/" +
                 "qwen2.5-0.5b-instruct-q4_k_m.gguf",
             sha256 = "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+            approxMb = 491,
             format = ModelFormat.GGUF
         ),
         SuggestedModel(
@@ -126,6 +129,7 @@ object SuggestedModels {
             "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/" +
                 "qwen2.5-1.5b-instruct-q4_k_m.gguf",
             sha256 = "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+            approxMb = 1117,
             format = ModelFormat.GGUF
         ),
         // --- Larger, stronger instruct models for sharper titles. The 0.5–1.5B models
@@ -137,6 +141,7 @@ object SuggestedModels {
             "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/" +
                 "qwen2.5-3b-instruct-q4_k_m.gguf",
             sha256 = "626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d",
+            approxMb = 2105,
             format = ModelFormat.GGUF
         ),
         SuggestedModel(
@@ -145,6 +150,7 @@ object SuggestedModels {
             "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/" +
                 "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
             sha256 = "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff",
+            approxMb = 2019,
             format = ModelFormat.GGUF
         ),
         SuggestedModel(
@@ -153,6 +159,7 @@ object SuggestedModels {
             "https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/" +
                 "gemma-2-2b-it-Q4_K_M.gguf",
             sha256 = "e0aee85060f168f0f2d8473d7ea41ce2f3230c1bc1374847505ea599288a7787",
+            approxMb = 1709,
             format = ModelFormat.GGUF
         )
     )

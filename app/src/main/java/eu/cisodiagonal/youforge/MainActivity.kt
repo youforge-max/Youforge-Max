@@ -83,7 +83,7 @@ private fun HomeScreen(onOpen: (Tool) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Spacer(Modifier.height(12.dp))
-        Text("YouForge", fontSize = 34.sp, fontWeight = FontWeight.Black)
+        Text("YouForge Max", fontSize = 34.sp, fontWeight = FontWeight.Black)
         Text("Offline creator toolkit", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
         Spacer(Modifier.height(8.dp))
 

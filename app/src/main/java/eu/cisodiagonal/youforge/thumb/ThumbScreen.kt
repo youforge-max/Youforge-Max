@@ -889,6 +889,7 @@ private fun ModelDialog(
     var msg by remember {
         mutableStateOf(if (modelMgr.isPresent()) "Model ready (offline)." else "No model yet — tap one below.")
     }
+    var confirmAll by remember { mutableStateOf(false) }
 
     val busy = dl.running || importing
     val curSlug = if (importing) ModelManager.IMPORTED_SLUG else if (dl.running) dl.slug else ""
@@ -948,7 +949,7 @@ private fun ModelDialog(
             val pending = remember(refresh) {
                 SuggestedModels.all.count { !it.gated && !modelMgr.isPresent(it.slug) }
             }
-            TextButton(onClick = { startAll() }, enabled = !busy && pending > 0) {
+            TextButton(onClick = { confirmAll = true }, enabled = !busy && pending > 0) {
                 Text(if (pending > 0) "Download all ($pending)" else "All installed")
             }
         },
@@ -1055,6 +1056,29 @@ private fun ModelDialog(
             }
         }
     )
+
+    // Confirm "Download all" with the total size first — it can be several GB.
+    if (confirmAll) {
+        val pendingModels = remember(refresh) {
+            SuggestedModels.all.filter { !it.gated && !modelMgr.isPresent(it.slug) }
+        }
+        val totalGb = pendingModels.sumOf { it.approxMb } / 1000f
+        AlertDialog(
+            onDismissRequest = { confirmAll = false },
+            confirmButton = {
+                TextButton(onClick = { confirmAll = false; startAll() }) { Text("Download") }
+            },
+            dismissButton = { TextButton(onClick = { confirmAll = false }) { Text("Cancel") } },
+            title = { Text("Download all models?") },
+            text = {
+                Text(
+                    "This downloads ${pendingModels.size} model(s), about " +
+                        "%.1f GB total.\nThey download in the background; you can keep using the app."
+                            .format(totalGb)
+                )
+            }
+        )
+    }
 }
 
 /* ---- helpers ---- */
