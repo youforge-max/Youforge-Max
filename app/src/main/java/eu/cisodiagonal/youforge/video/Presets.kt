@@ -123,7 +123,8 @@ class UiState {
 class PresetRepo(ctx: Context) {
     private val sp = ctx.getSharedPreferences("presets", Context.MODE_PRIVATE)
 
-    fun names(): List<String> = sp.all.keys.sorted()
+    /** User-facing preset names — excludes the reserved last-session slot. */
+    fun names(): List<String> = sp.all.keys.filter { it != LAST_KEY }.sorted()
 
     fun save(name: String, state: UiState) {
         sp.edit().putString(name, state.toJson().toString()).apply()
@@ -135,4 +136,16 @@ class PresetRepo(ctx: Context) {
     }
 
     fun delete(name: String) = sp.edit().remove(name).apply()
+
+    /** Autosaved working settings so the screen reopens on the last-used profile. */
+    fun saveLast(state: UiState) {
+        sp.edit().putString(LAST_KEY, state.toJson().toString()).apply()
+    }
+
+    fun loadLast(into: UiState): Boolean {
+        val s = sp.getString(LAST_KEY, null) ?: return false
+        return try { into.fromJson(JSONObject(s)); true } catch (_: Exception) { false }
+    }
+
+    private companion object { const val LAST_KEY = "__last_session__" }
 }

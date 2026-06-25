@@ -47,5 +47,10 @@
             android:name=".editor.VideoExportService"
             android:exported="false"
             android:foregroundServiceType="mediaProcessing|dataSync" />
+
+        <service
+            android:name=".video.NormalizeService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProcessing|dataSync" />
     </application>
 </manifest>

@@ -45,6 +45,19 @@ fun VideoNormalizerScreen() {
         var durationSec by remember { mutableIntStateOf(0) }
         var posSec by remember { mutableFloatStateOf(0f) }
 
+        // Reopen on the last-used profile (autosaved working settings).
+        LaunchedEffect(Unit) { repo.loadLast(ui) }
+
+        // Normalize runs in a foreground service (survives backgrounding, YouCut-style); the
+        // UI observes its process-wide progress so it reattaches if the screen is left/re-entered.
+        val normState by NormalizeJobs.state.collectAsState()
+        LaunchedEffect(normState) {
+            busy = normState.running
+            phase = normState.phase
+            frac = normState.frac
+            if (!normState.running && normState.finishedAt != 0L) status = normState.message
+        }
+
         fun stopPreview() { preview?.stop(); previewOn = false }
 
         /** (Re)load the 60 s preview window starting at [startSec] and play it. */
@@ -73,7 +86,7 @@ fun VideoNormalizerScreen() {
                 durationSec = (ms / 1000).toInt()
             }
         }
-        DisposableEffect(Unit) { onDispose { preview?.stop() } }
+        DisposableEffect(Unit) { onDispose { preview?.stop(); repo.saveLast(ui) } }
 
         val pickInput = rememberLauncherForActivityResult(
             ActivityResultContracts.OpenDocument()
@@ -91,22 +104,11 @@ fun VideoNormalizerScreen() {
             val src = inputUri
             if (outUri != null && src != null) {
                 stopPreview()
-                busy = true; status = null; frac = 0f; phase = "Starting"
-                val cfg = ui.snapshot()
-                scope.launch {
-                    val result = withContext(Dispatchers.Default) {
-                        runCatching {
-                            MediaProcessor.process(ctx, src, outUri, cfg) { p, f ->
-                                phase = p; frac = f
-                            }
-                        }
-                    }
-                    busy = false
-                    status = result.fold(
-                        onSuccess = { "Saved normalized video." },
-                        onFailure = { "Error: ${it.message}" }
-                    )
-                }
+                status = null
+                // Persist the working profile and hand the job to the foreground service so it
+                // keeps rendering if the app is backgrounded; UI progress comes from NormalizeJobs.
+                repo.saveLast(ui)
+                NormalizeService.start(ctx, src, outUri, ui.snapshot(), suggestedName(inputName))
             }
         }
 
@@ -202,7 +204,11 @@ fun VideoNormalizerScreen() {
 
             if (busy) {
                 LinearProgressIndicator(progress = { frac }, modifier = Modifier.fillMaxWidth())
-                Text("$phase  ${(frac * 100).toInt()}%", fontSize = 12.sp, color = Color.Gray)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("$phase  ${(frac * 100).toInt()}%", fontSize = 12.sp, color = Color.Gray)
+                    OutlinedButton(onClick = { NormalizeService.cancel(ctx) }) { Text("Cancel") }
+                }
             }
             status?.let { Text(it, color = if (it.startsWith("Error")) Color(0xFFFF6B6B) else Color(0xFF6BCB77)) }
 
