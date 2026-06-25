@@ -122,15 +122,21 @@ fun VideoNormalizerScreen() {
                 fontSize = 12.sp, color = Color.Gray
             )
 
-            // ---- file pick ----
-            Card { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Source video", fontWeight = FontWeight.SemiBold)
-                Text(if (inputName.isEmpty()) "(none selected)" else inputName,
-                    fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                Button(onClick = { pickInput.launch(arrayOf("video/*")) }, enabled = !busy) {
-                    Text("Pick video…")
-                }
-            } }
+            // ---- file pick + quick preset (top row) ----
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Card(Modifier.weight(1f)) { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Source video", fontWeight = FontWeight.SemiBold)
+                    Text(if (inputName.isEmpty()) "(none selected)" else inputName,
+                        fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    Button(onClick = { pickInput.launch(arrayOf("video/*")) }, enabled = !busy) {
+                        Text("Pick video…")
+                    }
+                } }
+                Card(Modifier.weight(1f)) { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Preset", fontWeight = FontWeight.SemiBold)
+                    PresetPicker(repo, ui, enabled = !busy)
+                } }
+            }
 
             // ---- preview ----
             Card { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -230,6 +236,30 @@ fun VideoNormalizerScreen() {
             SliderRow("Release", ui.release[b], 10f, 2000f, "ms", on) { ui.release[b] = it }
             SliderRow("Makeup", ui.makeup[b], 0f, 24f, "dB", on) { ui.makeup[b] = it }
         } }
+    }
+
+    /** Compact dropdown to apply a saved preset; sits next to the source picker up top. */
+    @Composable
+    private fun PresetPicker(repo: PresetRepo, ui: UiState, enabled: Boolean) {
+        var expanded by remember { mutableStateOf(false) }
+        var current by remember { mutableStateOf("(custom)") }
+        Box {
+            OutlinedButton(
+                onClick = { expanded = true }, enabled = enabled,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(current, maxLines = 1) }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                val names = repo.names()
+                if (names.isEmpty()) {
+                    DropdownMenuItem(text = { Text("(no presets)") }, enabled = false, onClick = {})
+                }
+                names.forEach { n ->
+                    DropdownMenuItem(text = { Text(n) }, onClick = {
+                        repo.load(n, ui); current = n; expanded = false
+                    })
+                }
+            }
+        }
     }
 
     @Composable
