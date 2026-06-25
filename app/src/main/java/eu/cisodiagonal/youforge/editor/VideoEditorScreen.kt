@@ -57,7 +57,18 @@ fun VideoEditorScreen() {
     var progress by remember { mutableStateOf(0) }
     var exporting by remember { mutableStateOf(false) }
 
-    val exporter = remember { EditorExporter(context) }
+    // Export runs in a foreground service (survives backgrounding, YouCut-style); the UI
+    // just observes its process-wide progress so it reattaches if the screen is left/re-entered.
+    val exportState by ExportJobs.state.collectAsState()
+    LaunchedEffect(exportState) {
+        exporting = exportState.running
+        progress = exportState.progress
+        status = when {
+            exportState.running -> "Exporting… ${exportState.progress}%"
+            exportState.finishedAt != 0L -> exportState.message
+            else -> status
+        }
+    }
 
     // Single-stack undo: discrete edits snapshot the prior project (trim/title drags
     // stay direct so they don't spam history).
@@ -199,19 +210,13 @@ fun VideoEditorScreen() {
                 onClick = {
                     focus.clearFocus()
                     exporting = true; progress = 0; status = "Exporting…"
-                    exporter.export(project, object : EditorExporter.Callback {
-                        override fun onProgress(percent: Int) { progress = percent }
-                        override fun onDone(output: java.io.File) {
-                            exporting = false; progress = 100
-                            status = "Saved: ${output.name}"
-                        }
-                        override fun onError(message: String) {
-                            exporting = false; status = "Error: $message"
-                        }
-                    })
+                    VideoExportService.start(context, project)
                 },
                 enabled = !exporting && !project.isEmpty
             ) { Text("Export") }
+            if (exporting) OutlinedButton(onClick = { VideoExportService.cancel(context) }) {
+                Text("Cancel")
+            }
         }
         if (exporting) LinearProgressIndicator(
             progress = { progress / 100f }, modifier = Modifier.fillMaxWidth()

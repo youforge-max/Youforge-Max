@@ -9,6 +9,9 @@
          background (data-sync type = a user-initiated network transfer). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Foreground service so a long video export keeps rendering while the app is
+         backgrounded (media-processing type on Android 14+; data-sync fallback below). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
     <!-- Show the download-progress notification (runtime-requested on Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- DEV ONLY: All-files access so downloaded models can be kept on shared storage and
@@ -39,5 +42,10 @@
             android:name=".thumb.ModelDownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".editor.VideoExportService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProcessing|dataSync" />
     </application>
 </manifest>
