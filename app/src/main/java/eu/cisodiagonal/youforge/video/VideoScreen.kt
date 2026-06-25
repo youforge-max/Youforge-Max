@@ -39,6 +39,7 @@ fun VideoNormalizerScreen() {
         var phase by remember { mutableStateOf("") }
         var frac by remember { mutableFloatStateOf(0f) }
         var status by remember { mutableStateOf<String?>(null) }
+        var linkBands by remember { mutableStateOf(false) }
 
         var preview by remember { mutableStateOf<PreviewPlayer?>(null) }
         var previewLoading by remember { mutableStateOf(false) }
@@ -200,8 +201,14 @@ fun VideoNormalizerScreen() {
             } }
 
             // ---- bands ----
+            Card { Column(Modifier.padding(12.dp)) {
+                ToggleRow("Link attack/release across bands", linkBands) { linkBands = it }
+                Text("When on, changing a band's Attack (or Release) applies it to all 5 bands. " +
+                    "Attack and Release stay independent; the output limiter is never affected.",
+                    fontSize = 12.sp, color = Color.Gray)
+            } }
             for (b in 0 until NUM_BANDS) {
-                BandCard(b, ui)
+                BandCard(b, ui, linkBands)
             }
 
             // ---- limiter ----
@@ -235,7 +242,7 @@ fun VideoNormalizerScreen() {
     }
 
     @Composable
-    private fun BandCard(b: Int, ui: UiState) {
+    private fun BandCard(b: Int, ui: UiState, linkBands: Boolean) {
         val lo = if (b == 0) 20f else DEFAULT_CUTOFFS[b - 1]
         val hi = DEFAULT_CUTOFFS[b]
         Card { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -244,8 +251,14 @@ fun VideoNormalizerScreen() {
             SliderRow("Threshold", ui.threshold[b], -60f, 0f, "dB", on) { ui.threshold[b] = it }
             SliderRow("Ratio", ui.ratio[b], 1f, 20f, ":1", on) { ui.ratio[b] = it }
             SliderRow("Knee", ui.knee[b], 0f, 24f, "dB", on) { ui.knee[b] = it }
-            SliderRow("Attack", ui.attack[b], 0.5f, 200f, "ms", on) { ui.attack[b] = it }
-            SliderRow("Release", ui.release[b], 10f, 2000f, "ms", on) { ui.release[b] = it }
+            // When linked, Attack/Release write all bands at once (limiter untouched, the two
+            // controls stay independent of each other).
+            SliderRow("Attack", ui.attack[b], 0.5f, 200f, "ms", on) {
+                if (linkBands) for (i in 0 until NUM_BANDS) ui.attack[i] = it else ui.attack[b] = it
+            }
+            SliderRow("Release", ui.release[b], 10f, 2000f, "ms", on) {
+                if (linkBands) for (i in 0 until NUM_BANDS) ui.release[i] = it else ui.release[b] = it
+            }
             SliderRow("Makeup", ui.makeup[b], 0f, 24f, "dB", on) { ui.makeup[b] = it }
         } }
     }
