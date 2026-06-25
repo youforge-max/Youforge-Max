@@ -17,7 +17,8 @@ object ExportJobs {
 
     data class State(
         val running: Boolean = false,
-        val progress: Int = 0,        // 0..100
+        val progress: Int = 0,        // 0..100 (meaningful only when !indeterminate)
+        val indeterminate: Boolean = false, // Media3 can't report a % yet → show a spinner
         val message: String = "",
         val finishedAt: Long = 0L,    // bumped each time a run ends (one-shot trigger for UI)
         val success: Boolean = false,
@@ -33,15 +34,17 @@ object ExportJobs {
     fun update(transform: (State) -> State) { _state.value = transform(_state.value) }
 
     fun starting() = update {
-        State(running = true, progress = 0, message = "Exporting…")
+        State(running = true, progress = 0, indeterminate = true, message = "Exporting…")
     }
 
+    /** A negative [percent] means Media3 has no measurable progress yet → indeterminate. */
     fun progress(percent: Int) = update {
-        it.copy(running = true, progress = percent.coerceIn(0, 100))
+        if (percent < 0) it.copy(running = true, indeterminate = true)
+        else it.copy(running = true, indeterminate = false, progress = percent.coerceIn(0, 100))
     }
 
     fun finished(success: Boolean, message: String, outputName: String = "") = update {
-        it.copy(running = false, success = success, message = message,
+        it.copy(running = false, indeterminate = false, success = success, message = message,
             outputName = outputName, progress = if (success) 100 else it.progress,
             finishedAt = System.currentTimeMillis())
     }

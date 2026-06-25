@@ -449,11 +449,12 @@ class EditorExporter(private val context: Context) {
     private val poll = object : Runnable {
         override fun run() {
             val t = transformer ?: return
-            val state = t.getProgress(progressHolder)
-            if (state != Transformer.PROGRESS_STATE_NOT_STARTED) {
-                // callback set in pollProgress via field
-            }
-            cb?.onProgress(progressHolder.progress)
+            // progressHolder.progress is only meaningful when the state is AVAILABLE; for
+            // NOT_STARTED / UNAVAILABLE it's stale (was reported as a frozen 0%). Report the
+            // real percent when available, else -1 so the UI/notification show a spinner.
+            val pct = if (t.getProgress(progressHolder) == Transformer.PROGRESS_STATE_AVAILABLE)
+                progressHolder.progress else -1
+            cb?.onProgress(pct)
             main.postDelayed(this, 200)
         }
     }

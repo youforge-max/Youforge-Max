@@ -64,6 +64,7 @@ fun VideoEditorScreen() {
         exporting = exportState.running
         progress = exportState.progress
         status = when {
+            exportState.running && exportState.indeterminate -> "Exporting…"
             exportState.running -> "Exporting… ${exportState.progress}%"
             exportState.finishedAt != 0L -> exportState.message
             else -> status
@@ -232,9 +233,12 @@ fun VideoEditorScreen() {
                 Text("Cancel")
             }
         }
-        if (exporting) LinearProgressIndicator(
-            progress = { progress / 100f }, modifier = Modifier.fillMaxWidth()
-        )
+        if (exporting) {
+            if (exportState.indeterminate) LinearProgressIndicator(Modifier.fillMaxWidth())
+            else LinearProgressIndicator(
+                progress = { progress / 100f }, modifier = Modifier.fillMaxWidth()
+            )
+        }
 
         // Undo + project save/load
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {

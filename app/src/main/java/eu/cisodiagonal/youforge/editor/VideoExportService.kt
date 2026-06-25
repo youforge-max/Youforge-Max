@@ -49,14 +49,15 @@ class VideoExportService : Service() {
         ExportJobs.pending = null
 
         ExportJobs.starting()
-        startForegroundNotif("Exporting…", 0)
+        startForegroundNotif("Exporting…", -1)
 
         val ex = EditorExporter(applicationContext)
         exporter = ex
         ex.export(project, object : EditorExporter.Callback {
             override fun onProgress(percent: Int) {
                 ExportJobs.progress(percent)
-                updateNotif("Exporting… $percent%", percent)
+                if (percent < 0) updateNotif("Exporting…", -1)
+                else updateNotif("Exporting… $percent%", percent)
             }
             override fun onDone(output: File) {
                 ExportJobs.finished(true, "Saved: ${output.name}", output.name)
@@ -115,7 +116,7 @@ class VideoExportService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(open)
-            .setProgress(100, percent.coerceIn(0, 100), false)
+            .setProgress(100, percent.coerceIn(0, 100), /* indeterminate= */ percent < 0)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancel", cancel)
             .build()
     }
