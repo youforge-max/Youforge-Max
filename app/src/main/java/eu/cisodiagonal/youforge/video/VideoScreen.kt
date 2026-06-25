@@ -5,6 +5,7 @@ import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -212,9 +213,6 @@ fun VideoNormalizerScreen() {
                 SliderRow("Release", ui.limRel, 10f, 500f, "ms", ui.limOn) { ui.limRel = it }
             } }
 
-            // ---- presets ----
-            PresetBar(repo, ui)
-
             // ---- process ----
             Button(
                 onClick = { createOutput.launch(suggestedName(inputName)) },
@@ -252,49 +250,67 @@ fun VideoNormalizerScreen() {
         } }
     }
 
-    /** Compact dropdown to apply a saved preset; sits next to the source picker up top. */
+    /**
+     * Compact, self-contained preset control next to the source picker: apply a saved
+     * preset, save the current settings as a new one, or delete one — no separate bar.
+     */
     @Composable
     private fun PresetPicker(repo: PresetRepo, ui: UiState, enabled: Boolean) {
         var expanded by remember { mutableStateOf(false) }
         var current by remember { mutableStateOf("(custom)") }
+        var names by remember { mutableStateOf(repo.names()) }
+        var showSave by remember { mutableStateOf(false) }
+        var newName by remember { mutableStateOf("") }
+
         Box {
             OutlinedButton(
-                onClick = { expanded = true }, enabled = enabled,
+                onClick = { names = repo.names(); expanded = true }, enabled = enabled,
                 modifier = Modifier.fillMaxWidth()
             ) { Text(current, maxLines = 1) }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                val names = repo.names()
-                if (names.isEmpty()) {
-                    DropdownMenuItem(text = { Text("(no presets)") }, enabled = false, onClick = {})
-                }
+                DropdownMenuItem(
+                    text = { Text("＋ Save current…") },
+                    onClick = { expanded = false; newName = ""; showSave = true }
+                )
+                if (names.isNotEmpty()) HorizontalDivider()
                 names.forEach { n ->
-                    DropdownMenuItem(text = { Text(n) }, onClick = {
-                        repo.load(n, ui); current = n; expanded = false
-                    })
+                    DropdownMenuItem(
+                        text = { Text(n, maxLines = 1) },
+                        onClick = { repo.load(n, ui); current = n; expanded = false },
+                        trailingIcon = {
+                            Text("✕", color = Color.Gray, modifier = Modifier.clickable {
+                                repo.delete(n); names = repo.names()
+                                if (current == n) current = "(custom)"
+                            })
+                        }
+                    )
                 }
             }
         }
-    }
 
-    @Composable
-    private fun PresetBar(repo: PresetRepo, ui: UiState) {
-        var name by remember { mutableStateOf("") }
-        var names by remember { mutableStateOf(repo.names()) }
-        Card { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Presets", fontWeight = FontWeight.SemiBold)
-            OutlinedTextField(value = name, onValueChange = { name = it },
-                label = { Text("name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { if (name.isNotBlank()) { repo.save(name, ui); names = repo.names() } }) { Text("Save") }
-            }
-            names.forEach { n ->
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { repo.load(n, ui); name = n }) { Text(n) }
-                    TextButton(onClick = { repo.delete(n); names = repo.names() }) { Text("✕") }
-                }
-            }
-        } }
+        if (showSave) {
+            AlertDialog(
+                onDismissRequest = { showSave = false },
+                title = { Text("Save preset") },
+                text = {
+                    OutlinedTextField(
+                        value = newName, onValueChange = { newName = it },
+                        label = { Text("name") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = newName.isNotBlank(),
+                        onClick = {
+                            repo.save(newName.trim(), ui); current = newName.trim()
+                            names = repo.names(); showSave = false
+                        }
+                    ) { Text("Save") }
+                },
+                dismissButton = { TextButton(onClick = { showSave = false }) { Text("Cancel") } }
+            )
+        }
     }
 
     @Composable
