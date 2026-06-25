@@ -98,6 +98,19 @@ fun VideoNormalizerScreen() {
             }
         }
 
+        // The normalize runs in a foreground service whose progress notification is runtime-
+        // permissioned on Android 13+. Without the grant it still runs, but the notification is
+        // silently hidden — request it (fire-and-forget) before kicking the job off.
+        val notifPerm = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { }
+        fun requestNotifIfNeeded() {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+                ctx.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) notifPerm.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+
         val createOutput = rememberLauncherForActivityResult(
             ActivityResultContracts.CreateDocument("video/mp4")
         ) { outUri ->
@@ -107,6 +120,7 @@ fun VideoNormalizerScreen() {
                 status = null
                 // Persist the working profile and hand the job to the foreground service so it
                 // keeps rendering if the app is backgrounded; UI progress comes from NormalizeJobs.
+                requestNotifIfNeeded()
                 repo.saveLast(ui)
                 NormalizeService.start(ctx, src, outUri, ui.snapshot(), suggestedName(inputName))
             }

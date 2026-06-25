@@ -99,6 +99,19 @@ fun VideoEditorScreen() {
         }
     }
 
+    // The export runs in a foreground service whose progress notification is runtime-
+    // permissioned on Android 13+. Without the grant the service still exports, but the
+    // notification is silently hidden — so request it (fire-and-forget) before exporting.
+    val notifPerm = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+    fun requestNotifIfNeeded() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) notifPerm.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     val musicPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -209,6 +222,7 @@ fun VideoEditorScreen() {
             Button(
                 onClick = {
                     focus.clearFocus()
+                    requestNotifIfNeeded()
                     exporting = true; progress = 0; status = "Exporting…"
                     VideoExportService.start(context, project)
                 },
