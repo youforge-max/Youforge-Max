@@ -25,8 +25,8 @@ For the step-by-step user guide, see **[MANUAL.md](MANUAL.md)**. For version
 history and device notes, see **[CHANGELOG.md](CHANGELOG.md)**.
 
 **Download:** prebuilt `arm64-v8a` release APKs are attached to each
-[GitHub Release](https://github.com/diagonalciso/Youforge-Max/releases) (latest:
-**v1.0-r17**). Or build it yourself — see [Build](#build).
+[GitHub Release](https://github.com/youforge-max/Youforge-Max/releases) (latest:
+**v1.1-max-p19**). Or build it yourself — see [Build](#build).
 
 ---
 
