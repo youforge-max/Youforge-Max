@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to YouForge. Versions map to `versionName` / `versionCode`
+All notable changes to Youforge-Max. Versions map to `versionName` / `versionCode`
 in `app/build.gradle.kts`. Release APKs are `arm64-v8a`, R8-minified, and signed.
 
 ## r17 (versionCode 17) — Kotlin 2.4 toolchain

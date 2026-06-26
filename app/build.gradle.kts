@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "eu.youforgemax.youforge"
+    namespace = "eu.youforgemax"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "eu.youforgemax.youforge"
+        applicationId = "eu.youforgemax"
         minSdk = 29              // MediaPipe GenAI runs on 24+; SAF + Compose fine on 29
         targetSdk = 35
         versionCode = 31
@@ -112,7 +112,7 @@ dependencies {
     implementation("com.alphacephei:vosk-android:0.3.75")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
-    // Video editor engine (YouForge Max): Media3 Transformer/Composition — on-device,
+    // Video editor engine (Youforge-Max): Media3 Transformer/Composition — on-device,
     // MediaCodec-based trim/merge/speed/effects/overlays, no FFmpeg, no watermark.
     // ExoPlayer + media3-ui drive the editor's live preview.
     implementation("androidx.media3:media3-transformer:1.8.1")

@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "YouForge"
+rootProject.name = "Youforge-Max"
 include(":app")

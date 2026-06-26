@@ -1,10 +1,10 @@
-# YouForge — User Manual
+# Youforge-Max — User Manual
 
 A complete walkthrough of both tools, every control, model management, and
 troubleshooting. For an overview and build instructions, see
 [README.md](README.md).
 
-> **Everything is offline.** The only time YouForge touches the network is when
+> **Everything is offline.** The only time Youforge-Max touches the network is when
 > *you* choose to download an AI model. After that it works in airplane mode.
 
 ---
@@ -30,7 +30,7 @@ troubleshooting. For an overview and build instructions, see
 
 ## Home screen
 
-When you open YouForge you see two cards:
+When you open Youforge-Max you see two cards:
 
 - **Thumbnail Maker** — make a 1280×720 thumbnail.
 - **Video Normalizer** — even out a video's audio loudness.
@@ -82,7 +82,7 @@ SURVIVED"*), then choose one of:
   [below](#managing-ai-models).)
 - **Template** — instant, fully offline. A deterministic generator picks a title
   style from keywords in your description. No model needed.
-- **🎙 Title from video** — pick a video clip and let YouForge transcribe its speech
+- **🎙 Title from video** — pick a video clip and let Youforge-Max transcribe its speech
   and turn that into the title (see [that section](#title-from-video-speech-to-text)).
 
 You can always edit the generated title text by hand afterwards.
@@ -125,7 +125,7 @@ title. Tap a sticker to select it and use its rotation slider.
 
 ### 6. Export
 
-- **Export 1280×720 PNG** — saves the finished thumbnail to `Pictures/YouForge`.
+- **Export 1280×720 PNG** — saves the finished thumbnail to `Pictures/Youforge-Max`.
 - **Export 3 A/B variants** — saves three versions with different title styles
   (`thumb_*_ab1..3.png`) so you can test which performs best.
 
@@ -143,8 +143,8 @@ Tap **Model** (top-right of Thumbnail Maker). The dialog lists the suggested mod
 | Qwen2.5-1.5B-Instruct (GGUF) | `.gguf` / llama.cpp | ~1.1 GB | Smaller q4 file, GGUF ecosystem |
 | Qwen2.5-0.5B-Instruct (GGUF) | `.gguf` / llama.cpp | ~0.47 GB | Smallest / fastest GGUF |
 
-YouForge runs **two engines**: `.task` models use **MediaPipe GenAI**; `.gguf`
-models use the bundled **llama.cpp** native backend. You pick a model and YouForge
+Youforge-Max runs **two engines**: `.task` models use **MediaPipe GenAI**; `.gguf`
+models use the bundled **llama.cpp** native backend. You pick a model and Youforge-Max
 uses the right engine automatically. The GGUF backend keeps the model **warm** (only
 the first suggestion per session pays the load cost) and constrains its output with a
 grammar so the title JSON is always valid.
@@ -176,7 +176,7 @@ by side and switch freely.
 
 1. In Thumbnail Maker, tap **🎙 Title from video (on-device)**.
 2. Pick a video clip that contains speech.
-3. On first use, YouForge downloads the **~40 MB English Vosk speech model** once
+3. On first use, Youforge-Max downloads the **~40 MB English Vosk speech model** once
    (progress shown). After that it's offline forever.
 4. The app decodes the clip's audio to 16 kHz mono, transcribes it locally, puts the
    transcript in the description box, and generates a title from it.
@@ -211,7 +211,7 @@ A fully offline audio loudness tool for video files.
 
 | What | Location | Notes |
 |---|---|---|
-| Exported thumbnails | `Pictures/YouForge/thumb_*.png` | Visible in your gallery |
+| Exported thumbnails | `Pictures/Youforge-Max/thumb_*.png` | Visible in your gallery |
 | LLM models (`.task` / `.gguf`) | App private storage | Never in shared storage or the repo |
 | Vosk speech model | App private storage | Downloaded once, unpacked locally |
 | Bundled vision models | Inside the APK | Ship with the app, work offline |

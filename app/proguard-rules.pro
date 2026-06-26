@@ -1,4 +1,4 @@
-# YouForge R8 keep rules.
+# Youforge-Max R8 keep rules.
 #
 # The native ML libraries reach Java/Kotlin members reflectively or over JNI, so
 # R8 must not rename or strip them. Compose + Kotlin metadata are handled by the

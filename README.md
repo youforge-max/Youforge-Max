@@ -1,8 +1,8 @@
-# YouForge
+# Youforge-Max
 
 **An offline, private, on-device creator toolkit for Android.**
 
-YouForge is a single app with two tools behind a home screen:
+Youforge-Max is a single app with two tools behind a home screen:
 
 1. **Thumbnail Maker** — turn a photo + a short description into a polished
    1280×720 YouTube thumbnail, with an on-device AI title, text effects,
@@ -15,7 +15,7 @@ optional, one-time download of the on-device AI models — after that the app wo
 fully offline, even in airplane mode. The app declares a single permission:
 `INTERNET` (for those model downloads).
 
-- **Package:** `eu.youforgemax.youforge`
+- **Package:** `eu.youforgemax`
 - **Version:** 1.0-r17 (versionCode 17)
 - **Platform:** Android 10+ (API 29 → 35), 64-bit ARM (`arm64-v8a`)
 - **Built with:** Kotlin 2.4 · Jetpack Compose · Material 3 · NDK (llama.cpp)
@@ -25,14 +25,14 @@ For the step-by-step user guide, see **[MANUAL.md](MANUAL.md)**. For version
 history and device notes, see **[CHANGELOG.md](CHANGELOG.md)**.
 
 **Download:** prebuilt `arm64-v8a` release APKs are attached to each
-[GitHub Release](https://github.com/diagonalciso/YouForge/releases) (latest:
+[GitHub Release](https://github.com/diagonalciso/Youforge-Max/releases) (latest:
 **v1.0-r17**). Or build it yourself — see [Build](#build).
 
 ---
 
 ## Why offline?
 
-Creator tools usually ship your photos, audio and ideas to a cloud API. YouForge
+Creator tools usually ship your photos, audio and ideas to a cloud API. Youforge-Max
 does the opposite: the language model, the speech-to-text, the image segmentation
 and the face detector all run locally with MediaPipe and Vosk. Your media never
 leaves the device, there's no account, no subscription, and no rate limit.
@@ -61,7 +61,7 @@ leaves the device, there's no account, no subscription, and no rate limit.
   picks a sensible title style from keywords.
 
 **Title from video (on-device speech-to-text)**
-- Pick a clip; YouForge transcribes its speech locally with **Vosk** and feeds the
+- Pick a clip; Youforge-Max transcribes its speech locally with **Vosk** and feeds the
   transcript to the title generator. The ~40 MB English speech model downloads once
   on first use, then runs offline.
 
@@ -87,7 +87,7 @@ leaves the device, there's no account, no subscription, and no rate limit.
 - **Style presets** + **brand kit** — five one-tap looks, plus save your own style
   and have it applied automatically to future thumbnails.
 
-**Export** — 1280×720 PNG to `Pictures/YouForge`.
+**Export** — 1280×720 PNG to `Pictures/Youforge-Max`.
 
 ### Video Normalizer
 
@@ -246,7 +246,7 @@ troubleshooting — is in **[MANUAL.md](MANUAL.md)**. The short version:
 ## Project structure
 
 ```
-app/src/main/java/eu/youforgemax/youforge/
+app/src/main/java/eu/youforgemax/
 ├─ MainActivity.kt            # launcher + home screen + nav
 ├─ thumb/                     # Thumbnail Maker
 │  ├─ ThumbScreen.kt          # Compose UI for the whole tool
@@ -304,7 +304,7 @@ so it can be reused directly by the planned desktop builds.
 
 ## Privacy
 
-YouForge makes no analytics calls and has no backend. The only outbound network
+Youforge-Max makes no analytics calls and has no backend. The only outbound network
 requests are HTTPS downloads of the on-device model files (from Hugging Face and the
 Vosk model host) when you choose to install them. Your photos, videos and titles are
 processed entirely on the device and never leave it.
@@ -328,5 +328,5 @@ Third-party components keep their own licenses:
 - **Vosk** (`vosk-android`, Apache-2.0) and `vosk-model-small-en-us-0.15`
   (Apache-2.0).
 - The LLM `.task` models you download keep the license of their respective
-  repositories (e.g. Qwen — Apache-2.0; TinyLlama — Apache-2.0). YouForge does not
+  repositories (e.g. Qwen — Apache-2.0; TinyLlama — Apache-2.0). Youforge-Max does not
   redistribute them; it downloads them from their original hosts on request.

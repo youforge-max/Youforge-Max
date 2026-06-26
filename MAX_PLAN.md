@@ -1,6 +1,6 @@
-# YouForge Max — video editor (YouCut-style)
+# Youforge-Max — video editor (YouCut-style)
 
-Goal: a free, **offline, on-device, no-watermark** video editor inside YouForge,
+Goal: a free, **offline, on-device, no-watermark** video editor inside Youforge-Max,
 alongside the existing Thumbnail Maker + Video Normalizer. Branch: `youforge-max`.
 
 ## Why it's feasible
@@ -10,12 +10,12 @@ transitions / export ≤4K, with no watermark. Every piece maps onto Android's o
 **androidx.media3 Transformer + Composition** engine (MediaCodec-based, Apache-2.0,
 fully offline, no FFmpeg, no watermark):
 
-| YouCut feature | YouForge Max approach |
+| YouCut feature | Youforge-Max approach |
 |----------------|------------------------|
 | Trim / cut / split | `MediaItem.ClippingConfiguration` per clip |
 | Merge / join | `EditedMediaItemSequence` (one track) |
 | Speed 0.2–100× | `SpeedChangeEffect` on an `EditedMediaItem` |
-| Text / stickers | Media3 `OverlayEffect` (`TextOverlay`/`BitmapOverlay`) — **reuse YouForge's overlay/title renderer + sticker set** |
+| Text / stickers | Media3 `OverlayEffect` (`TextOverlay`/`BitmapOverlay`) — **reuse Youforge-Max's overlay/title renderer + sticker set** |
 | Filters / FX | Media3 `GlEffect` / `RgbMatrix` / LUT |
 | Transitions | crossfade via overlapping `EditedMediaItem`s (Media3 1.4+) |
 | Music / volume | extra audio `EditedMediaItemSequence` + `Effects` volume; **reuse the 5-band DSP from Video Normalizer for mastering** |
@@ -23,7 +23,7 @@ fully offline, no FFmpeg, no watermark):
 | Live preview | `ExoPlayer` + `PlayerView` (+ `ExoPlayer.setVideoEffects` for previewing effects) |
 
 So we're **not** reimplementing a codec stack — we orchestrate Media3 and reuse two
-things YouForge already has: the **Compose UI** and the **overlay renderer + audio DSP**.
+things Youforge-Max already has: the **Compose UI** and the **overlay renderer + audio DSP**.
 
 ## Phases
 
@@ -76,5 +76,5 @@ things YouForge already has: the **Compose UI** and the **overlay renderer + aud
 - Transformer must start on a Looper thread (handled: main thread + progress poll).
 - HDR / 10-bit and mixed codecs can need tone-mapping flags — add when hit.
 - Keep the editor a single track in early phases; multi-layer is a later lift.
-- Current YouForge functionality (thumbnail, normalizer, GGUF/Vosk/vision) is
+- Current Youforge-Max functionality (thumbnail, normalizer, GGUF/Vosk/vision) is
   unchanged — Max is purely additive. versionName `1.1-max-p1`, versionCode 18.
