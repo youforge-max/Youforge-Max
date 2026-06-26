@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.thumb
+package eu.youforgemax.youforge.thumb
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

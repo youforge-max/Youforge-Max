@@ -1,5 +1,5 @@
-package eu.cisodiagonal.youforge.thumb
-import eu.cisodiagonal.youforge.R
+package eu.youforgemax.youforge.thumb
+import eu.youforgemax.youforge.R
 
 /** A draggable overlay element: either a bundled vector or an emoji glyph. */
 sealed interface StickerKind {

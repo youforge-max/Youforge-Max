@@ -15,7 +15,7 @@ optional, one-time download of the on-device AI models — after that the app wo
 fully offline, even in airplane mode. The app declares a single permission:
 `INTERNET` (for those model downloads).
 
-- **Package:** `eu.cisodiagonal.youforge`
+- **Package:** `eu.youforgemax.youforge`
 - **Version:** 1.0-r17 (versionCode 17)
 - **Platform:** Android 10+ (API 29 → 35), 64-bit ARM (`arm64-v8a`)
 - **Built with:** Kotlin 2.4 · Jetpack Compose · Material 3 · NDK (llama.cpp)
@@ -246,7 +246,7 @@ troubleshooting — is in **[MANUAL.md](MANUAL.md)**. The short version:
 ## Project structure
 
 ```
-app/src/main/java/eu/cisodiagonal/youforge/
+app/src/main/java/eu/youforgemax/youforge/
 ├─ MainActivity.kt            # launcher + home screen + nav
 ├─ thumb/                     # Thumbnail Maker
 │  ├─ ThumbScreen.kt          # Compose UI for the whole tool

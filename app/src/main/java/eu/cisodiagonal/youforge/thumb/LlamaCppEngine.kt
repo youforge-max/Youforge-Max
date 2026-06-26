@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.thumb
+package eu.youforgemax.youforge.thumb
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

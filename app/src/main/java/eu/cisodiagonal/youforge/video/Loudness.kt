@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.video
+package eu.youforgemax.youforge.video
 
 import kotlin.math.log10
 import kotlin.math.tan

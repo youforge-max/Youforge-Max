@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.asr
+package eu.youforgemax.youforge.asr
 
 import org.json.JSONObject
 import org.vosk.Model

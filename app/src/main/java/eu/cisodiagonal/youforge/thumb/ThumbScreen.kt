@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.thumb
+package eu.youforgemax.youforge.thumb
 
 import android.content.ContentValues
 import android.graphics.Bitmap
@@ -38,9 +38,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import androidx.lifecycle.lifecycleScope
-import eu.cisodiagonal.youforge.asr.AudioPcmDecoder
-import eu.cisodiagonal.youforge.asr.AudioTranscriber
-import eu.cisodiagonal.youforge.asr.VoskModelManager
+import eu.youforgemax.youforge.asr.AudioPcmDecoder
+import eu.youforgemax.youforge.asr.AudioTranscriber
+import eu.youforgemax.youforge.asr.VoskModelManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

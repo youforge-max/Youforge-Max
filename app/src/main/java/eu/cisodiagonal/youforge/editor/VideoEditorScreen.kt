@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.editor
+package eu.youforgemax.youforge.editor
 
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever

@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.video
+package eu.youforgemax.youforge.video
 
 import android.content.Context
 import androidx.compose.runtime.getValue

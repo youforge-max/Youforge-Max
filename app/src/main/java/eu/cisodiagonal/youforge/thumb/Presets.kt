@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.thumb
+package eu.youforgemax.youforge.thumb
 
 /**
  * A named title style (effect + colours + position). Built-in presets plus the

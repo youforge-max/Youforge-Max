@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.thumb
+package eu.youforgemax.youforge.thumb
 
 /**
  * JNI bridge to the vendored llama.cpp (GGUF on-device inference). Keep-warm:

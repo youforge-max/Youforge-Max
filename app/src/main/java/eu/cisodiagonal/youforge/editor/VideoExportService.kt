@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.editor
+package eu.youforgemax.youforge.editor
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -143,7 +143,7 @@ class VideoExportService : Service() {
     companion object {
         private const val CHANNEL_ID = "yf_video_exports"
         private const val NOTIF_ID = 4012
-        private const val ACTION_CANCEL = "eu.cisodiagonal.youforge.EXPORT_CANCEL"
+        private const val ACTION_CANCEL = "eu.youforgemax.youforge.EXPORT_CANCEL"
 
         /** Park [project] and start the export in the foreground service. */
         fun start(context: Context, project: EditorProject) {

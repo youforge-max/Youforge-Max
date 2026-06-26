@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.asr
+package eu.youforgemax.youforge.asr
 
 import android.content.Context
 import android.media.MediaCodec

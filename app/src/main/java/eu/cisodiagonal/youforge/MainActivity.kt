@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge
+package eu.youforgemax.youforge
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -13,9 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import eu.cisodiagonal.youforge.editor.VideoEditorScreen
-import eu.cisodiagonal.youforge.thumb.ThumbnailScreen
-import eu.cisodiagonal.youforge.video.VideoNormalizerScreen
+import eu.youforgemax.youforge.editor.VideoEditorScreen
+import eu.youforgemax.youforge.thumb.ThumbnailScreen
+import eu.youforgemax.youforge.video.VideoNormalizerScreen
 
 /** Single launcher activity hosting both tools behind a home screen. */
 class MainActivity : ComponentActivity() {

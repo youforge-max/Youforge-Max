@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.video
+package eu.youforgemax.youforge.video
 
 /**
  * Stateful per-sample processing chain for one audio stream. Build once per run,

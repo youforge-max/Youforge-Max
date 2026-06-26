@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.video
+package eu.youforgemax.youforge.video
 
 import android.net.Uri
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * Process-wide normalize status shared between [NormalizeService] (the writer, which keeps
  * the offline DSP render running while the app is backgrounded) and the Video Normalizer UI
- * (the reader). Mirrors the editor's [eu.cisodiagonal.youforge.editor.ExportJobs] and the
+ * (the reader). Mirrors the editor's [eu.youforgemax.youforge.editor.ExportJobs] and the
  * model-download pattern: the service owns the work; the UI just observes this so progress
  * shows whenever the screen is open and reattaches if it's left/re-entered.
  *

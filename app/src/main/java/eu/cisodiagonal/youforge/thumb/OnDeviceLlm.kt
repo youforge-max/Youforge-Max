@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.thumb
+package eu.youforgemax.youforge.thumb
 
 import android.content.Context
 import com.google.mediapipe.tasks.genai.llminference.LlmInference

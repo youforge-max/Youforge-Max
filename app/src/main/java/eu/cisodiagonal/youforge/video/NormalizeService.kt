@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.video
+package eu.youforgemax.youforge.video
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -144,7 +144,7 @@ class NormalizeService : Service() {
     companion object {
         private const val CHANNEL_ID = "yf_audio_normalize"
         private const val NOTIF_ID = 4013
-        private const val ACTION_CANCEL = "eu.cisodiagonal.youforge.NORMALIZE_CANCEL"
+        private const val ACTION_CANCEL = "eu.youforgemax.youforge.NORMALIZE_CANCEL"
 
         /** Park the job and start the normalize in the foreground service. */
         fun start(context: Context, input: android.net.Uri, output: android.net.Uri, cfg: DspConfig, outName: String) {

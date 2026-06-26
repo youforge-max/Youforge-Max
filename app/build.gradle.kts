@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "eu.cisodiagonal.youforge"
+    namespace = "eu.youforgemax.youforge"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "eu.cisodiagonal.youforge"
+        applicationId = "eu.youforgemax.youforge"
         minSdk = 29              // MediaPipe GenAI runs on 24+; SAF + Compose fine on 29
         targetSdk = 35
         versionCode = 31

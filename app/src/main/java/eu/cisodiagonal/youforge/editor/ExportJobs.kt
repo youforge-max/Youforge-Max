@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.editor
+package eu.youforgemax.youforge.editor
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * Process-wide export status shared between [VideoExportService] (the writer, which keeps
  * the Media3 export running while the app is backgrounded) and the editor UI (the reader).
- * Mirrors the model-download pattern ([eu.cisodiagonal.youforge.thumb.ModelDownloads]): the
+ * Mirrors the model-download pattern ([eu.youforgemax.youforge.thumb.ModelDownloads]): the
  * service owns the work; the UI observes this so progress shows whenever the editor is open,
  * and survives the screen leaving/re-entering composition.
  *

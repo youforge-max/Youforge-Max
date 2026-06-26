@@ -1,4 +1,4 @@
-package eu.cisodiagonal.youforge.thumb
+package eu.youforgemax.youforge.thumb
 
 /**
  * Deterministic A/B style variants of a base spec — different effect / colour /

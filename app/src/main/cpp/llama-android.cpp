@@ -47,7 +47,7 @@ ws ::= [ \t\n]*
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_eu_cisodiagonal_youforge_thumb_LlamaBridge_nativeLoad(
+Java_eu_youforgemax_youforge_thumb_LlamaBridge_nativeLoad(
         JNIEnv *env, jobject, jstring jPath, jint jThreads) {
     std::lock_guard<std::mutex> lock(g_mutex);
     const char *cPath = env->GetStringUTFChars(jPath, nullptr);
@@ -86,7 +86,7 @@ Java_eu_cisodiagonal_youforge_thumb_LlamaBridge_nativeLoad(
 
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_eu_cisodiagonal_youforge_thumb_LlamaBridge_nativeGenerate(
+Java_eu_youforgemax_youforge_thumb_LlamaBridge_nativeGenerate(
         JNIEnv *env, jobject, jstring jPrompt, jint jnPredict) {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (!g_ctx || !g_model) return env->NewStringUTF("");
@@ -134,7 +134,7 @@ Java_eu_cisodiagonal_youforge_thumb_LlamaBridge_nativeGenerate(
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_eu_cisodiagonal_youforge_thumb_LlamaBridge_nativeFree(JNIEnv *, jobject) {
+Java_eu_youforgemax_youforge_thumb_LlamaBridge_nativeFree(JNIEnv *, jobject) {
     std::lock_guard<std::mutex> lock(g_mutex);
     freeAll();
 }
