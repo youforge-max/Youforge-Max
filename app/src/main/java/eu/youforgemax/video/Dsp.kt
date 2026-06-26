@@ -10,7 +10,7 @@ import kotlin.math.sqrt
 /**
  * Offline software port of the live app's 5-band compressor / limiter.
  *
- * The live app (five-band-comp) uses android.media.audiofx.DynamicsProcessing,
+ * The live app (Optiforge-Max) uses android.media.audiofx.DynamicsProcessing,
  * a REALTIME effect bolted to the output mix — it has no file-render API. To
  * process a file we reimplement the same signal chain in pure Kotlin on PCM:
  *

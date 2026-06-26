@@ -36,7 +36,7 @@ data class DspConfig(
 /**
  * Single observable source of truth for every control. Compose reads/writes it;
  * snapshot() freezes it for the worker; JSON (de)serialises presets.
- * Mirrors five-band-comp's UiState plus normalize target + per-band knee.
+ * Mirrors Optiforge-Max's UiState plus normalize target + per-band knee.
  */
 class UiState {
     private val N = NUM_BANDS
