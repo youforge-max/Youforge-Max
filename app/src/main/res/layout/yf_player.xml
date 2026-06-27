@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Preview surface for the editor. surface_type="texture_view" is deliberate: a default
+  SurfaceView renders black / wrong z-order inside Jetpack Compose and cannot be drawn
+  over by the Compose sticker + control overlays. A TextureView composites correctly.
+  The default controller is off — the editor draws its own cyan scrub + play controls.
+-->
+<androidx.media3.ui.PlayerView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    app:surface_type="texture_view"
+    app:use_controller="false"
+    app:resize_mode="fit" />
