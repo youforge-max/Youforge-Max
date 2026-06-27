@@ -156,10 +156,12 @@ fun VideoEditorScreen() {
         val c = project.clips.getOrNull(selected)
         if (c != null) {
             player.setMediaItem(MediaItem.fromUri(c.uri))
-            // Only attach effects when a filter is active — the plain decode path is the
-            // most reliable for first-frame render.
-            runCatching {
-                player.setVideoEffects(if (project.filter == VideoFilter.NONE) emptyList() else EditorEffects.forFilter(project.filter))
+            // Only attach effects when a filter is active. Calling setVideoEffects at all —
+            // even with an empty list — switches ExoPlayer onto the effects video pipeline,
+            // which can render the first frame but then stall playback. For NONE we never
+            // touch it, keeping the plain, reliable decode/playback path.
+            if (project.filter != VideoFilter.NONE) {
+                runCatching { player.setVideoEffects(EditorEffects.forFilter(project.filter)) }
             }
             player.prepare()
             runCatching { player.seekTo(c.trimStartMs) }
@@ -327,8 +329,7 @@ private fun PreviewStage(
     onStickerSel: (Int) -> Unit,
     onProject: (EditorProject) -> Unit,
 ) {
-    var showControls by remember { mutableStateOf(true) }
-    Box(Modifier.fillMaxSize().clickable { showControls = !showControls }, contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         AndroidView(
             factory = { ctx ->
                 (LayoutInflater.from(ctx).inflate(R.layout.yf_player, null) as PlayerView).apply { this.player = player }
@@ -369,30 +370,26 @@ private fun PreviewStage(
             )
         }
 
-        // Centre play / pause.
-        AnimatedVisibility(visible = showControls, enter = fadeIn(), exit = fadeOut()) {
-            Box(
-                Modifier.size(64.dp).clip(CircleShape).background(Color(0xA0000000)).clickable { onTogglePlay() },
-                contentAlignment = Alignment.Center
-            ) { Text(if (isPlaying) "⏸" else "▶", color = Ink.accent, fontSize = 26.sp) }
-        }
+        // Centre play / pause (always visible so the tap target is never swallowed).
+        Box(
+            Modifier.size(64.dp).clip(CircleShape).background(Color(0xA0000000)).clickable { onTogglePlay() },
+            contentAlignment = Alignment.Center
+        ) { Text(if (isPlaying) "⏸" else "▶", color = Ink.accent, fontSize = 26.sp) }
 
         // Scrub row.
-        AnimatedVisibility(visible = showControls, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
-            Row(
-                Modifier.fillMaxWidth().background(Color(0x80000000)).padding(horizontal = 10.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(fmt(positionMs), color = Color.White, fontSize = 11.sp)
-                Slider(
-                    value = positionMs.coerceIn(0L, clipDurMs).toFloat(),
-                    onValueChange = { onSeek(it.toLong()) },
-                    valueRange = 0f..(clipDurMs.takeIf { it > 0 } ?: 1L).toFloat(),
-                    colors = SliderDefaults.colors(thumbColor = Ink.accent, activeTrackColor = Ink.accent, inactiveTrackColor = Ink.stroke),
-                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                )
-                Text(fmt(clipDurMs), color = Color.White, fontSize = 11.sp)
-            }
+        Row(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0x80000000)).padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(fmt(positionMs), color = Color.White, fontSize = 11.sp)
+            Slider(
+                value = positionMs.coerceIn(0L, clipDurMs).toFloat(),
+                onValueChange = { onSeek(it.toLong()) },
+                valueRange = 0f..(clipDurMs.takeIf { it > 0 } ?: 1L).toFloat(),
+                colors = SliderDefaults.colors(thumbColor = Ink.accent, activeTrackColor = Ink.accent, inactiveTrackColor = Ink.stroke),
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+            )
+            Text(fmt(clipDurMs), color = Color.White, fontSize = 11.sp)
         }
     }
 }
