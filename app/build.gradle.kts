@@ -115,9 +115,9 @@ dependencies {
     // Video editor engine (Youforge-Max): Media3 Transformer/Composition — on-device,
     // MediaCodec-based trim/merge/speed/effects/overlays, no FFmpeg, no watermark.
     // ExoPlayer + media3-ui drive the editor's live preview.
-    implementation("androidx.media3:media3-transformer:1.8.1")
-    implementation("androidx.media3:media3-effect:1.8.1")
-    implementation("androidx.media3:media3-common:1.8.1")
-    implementation("androidx.media3:media3-exoplayer:1.8.1")
-    implementation("androidx.media3:media3-ui:1.8.1")
+    implementation("androidx.media3:media3-transformer:1.10.1")
+    implementation("androidx.media3:media3-effect:1.10.1")
+    implementation("androidx.media3:media3-common:1.10.1")
+    implementation("androidx.media3:media3-exoplayer:1.10.1")
+    implementation("androidx.media3:media3-ui:1.10.1")
 }
