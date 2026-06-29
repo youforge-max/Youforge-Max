@@ -375,14 +375,16 @@ class EditorExporter(private val context: Context) {
             sequences.add(odd.build())  // secondary = top (alpha-ramped over the bottom)
         } else {
             sequences.add(
-                EditedMediaItemSequence(project.clips.map { baseItem(it, listOfNotNull(edgeEffect(it))) })
+                EditedMediaItemSequence.Builder().apply {
+                    project.clips.forEach { addItem(baseItem(it, listOfNotNull(edgeEffect(it)))) }
+                }.build()
             )
         }
         // Optional background music as a separate audio-only sequence; the Composition mixes
         // it with the clips' own audio.
         project.musicUri?.let { music ->
             val musicItem = EditedMediaItem.Builder(MediaItem.fromUri(music)).build()
-            sequences.add(EditedMediaItemSequence(listOf(musicItem)))
+            sequences.add(EditedMediaItemSequence.Builder().addItem(musicItem).build())
         }
         // Composition-level video effect: normalise every clip to the chosen canvas so
         // mixed-resolution/aspect clips merge cleanly. SOURCE keeps the source shape
