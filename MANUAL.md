@@ -68,8 +68,8 @@ The **Photo (on-device AI)** row (only relevant on a 64-bit ARM device — see
   third (classic reaction-thumbnail framing).
 - **Restore photo** — undo any of the above and return to the original image.
 
-If a cut-out or face-frame can't run (no subject/face found, or the device lacks
-the vision library), the status line says so and the photo is left unchanged.
+If a cut-out or face-frame can't run, the status line names the reason — "no face
+detected in this photo", say — and the photo is left unchanged.
 
 ### 3. Get a title
 
@@ -233,9 +233,13 @@ login) — download it on a computer and use **Pick local file** instead. A
 download that fails right after completing is a **SHA-256 mismatch** (corrupt or
 wrong file) — retry, or import a verified copy locally.
 
-**"Cut out" or "Auto-frame face" says it couldn't process.**
-Either no clear subject/face was found, or you're on a build without the vision
-library (e.g. an x86_64 emulator). Use a 64-bit ARM device for these two features.
+**"Cut out" or "Auto-frame face" failed.**
+The status line names the reason. "No face detected in this photo" means exactly
+that — try a photo where the face is larger and clearly lit. Anything else is a
+real error; it is also written to logcat under the tag `VisionTools`.
+
+Builds before **v1.5.1** failed here on *every* photo, in release builds only. See
+the changelog.
 
 **The AI title takes a long time.**
 On-device LLM speed depends on the chip and the model size. Use **Qwen2.5-0.5B** on

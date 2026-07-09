@@ -24,9 +24,9 @@ fully offline, even in airplane mode. The app declares a single permission:
 For the step-by-step user guide, see **[MANUAL.md](MANUAL.md)**. For version
 history and device notes, see **[CHANGELOG.md](CHANGELOG.md)**.
 
-**Download:** prebuilt `arm64-v8a` release APKs are attached to each
-[GitHub Release](https://github.com/youforge-max/Youforge-Max/releases) (latest:
-**v1.1-max-p19**). Or build it yourself — see [Build](#build).
+**Download:** a prebuilt, signed `arm64-v8a` APK is attached to the latest
+[GitHub Release](https://github.com/youforge-max/Youforge-Max/releases/latest) —
+currently **v1.5.1**. Or build it yourself — see [Build](#build).
 
 ---
 
@@ -148,13 +148,12 @@ API 24+, but the rest of the app assumes 29+.
 | ABI | Release APK | Debug APK | Notes |
 |---|---|---|---|
 | `arm64-v8a` (64-bit ARM) | ✅ | ✅ | The only target for releases — virtually all phones/tablets from ~2017 on |
-| `x86_64` | ❌ | ✅ | Debug builds add it for the Android emulator. **Background removal and Auto-frame face do not work on x86_64** — MediaPipe Vision ships no x86_64 native library. The LLM and Vosk paths do work on x86_64. |
+| `x86_64` | ❌ | ✅ | Debug builds add it so the app runs on an Android emulator. Every feature works there, vision included — `tasks-vision` ships an x86_64 native library. |
 | `armeabi-v7a` (32-bit ARM) | ❌ | ❌ | Not built. The MediaPipe GenAI runtime is 64-bit only. |
 | `x86` (32-bit) | ❌ | ❌ | Not built. |
 
-> **Use a 64-bit ARM device for the full feature set.** The x86_64 debug variant
-> exists only so the app can be exercised on an emulator, where the two camera-AI
-> features are unavailable by design.
+> Releases are arm64-only because that is what the target devices are; the x86_64
+> debug variant exists so the app can be exercised on an emulator.
 
 ### Memory & performance guidance
 
@@ -178,9 +177,9 @@ means slow, and the template path is always instant.
 
 - **Samsung Galaxy Tab S7+** (Snapdragon 865+, 8 GB, One UI on Android up to 13) —
   primary test device, all features confirmed.
-- **Android emulator** (API 29, x86_64) — used for CI-style verification of
-  rendering, export, LLM title generation and Vosk speech-to-text. (Vision features
-  are arm-only and verified on hardware instead.)
+- **Android emulator** (API 34, x86_64) — used for CI-style verification of
+  rendering, export, LLM title generation, Vosk speech-to-text, and the vision
+  features, against both debug and minified release builds.
 
 Any 64-bit ARM phone or tablet on Android 10+ with ≥4 GB RAM should run the full
 app; ≥6 GB is recommended if you want to use the on-device LLM.
