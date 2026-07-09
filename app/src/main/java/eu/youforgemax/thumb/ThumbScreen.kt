@@ -493,7 +493,10 @@ fun ThumbnailScreen(onBack: () -> Unit = {}) {
                         busy = true; status = "$label…"
                         val res = withContext(Dispatchers.Default) { op(src) }
                         busy = false
-                        if (res == null) { status = "$label: couldn't process (no subject/face found, or on-device AI unavailable on this device)."; return@launch }
+                        if (res == null) {
+                            status = "$label failed — ${VisionTools.lastError ?: "unknown reason"}"
+                            return@launch
+                        }
                         sourceBitmap = res
                         rerender()
                         status = "$label done."

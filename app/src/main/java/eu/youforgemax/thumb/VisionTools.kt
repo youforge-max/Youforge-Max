@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
+import android.util.Log
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.ByteBufferExtractor
 import com.google.mediapipe.tasks.core.BaseOptions
@@ -22,15 +23,33 @@ import kotlin.math.roundToInt
  * everything runs offline with no cloud. Android-specific by nature; the future
  * desktop builds will provide their own implementation behind the same idea.
  *
- * Every call is fully guarded — on any failure it returns the original image (or
- * null) and never throws into the UI.
+ * Every call is fully guarded — on any failure it returns null and never throws
+ * into the UI; [lastError] then carries the reason (also logged under "VisionTools").
  */
 object VisionTools {
 
+    private const val TAG = "VisionTools"
     private const val SEG_MODEL = "selfie_segmenter.tflite"
     private const val FACE_MODEL = "blaze_face_short_range.tflite"
 
     enum class BackgroundStyle { DARK, BLUR, COLOR }
+
+    /** Why the last call returned null. Null when the last call succeeded. */
+    @Volatile var lastError: String? = null
+        private set
+
+    private fun fail(op: String, t: Throwable): Nothing? {
+        Log.e(TAG, "$op failed", t)
+        val cause = generateSequence(t) { it.cause }.last()
+        lastError = "${cause.javaClass.simpleName}: ${cause.message ?: "no message"}"
+        return null
+    }
+
+    private fun fail(op: String, reason: String): Nothing? {
+        Log.w(TAG, "$op: $reason")
+        lastError = reason
+        return null
+    }
 
     /**
      * Cut the subject out with the selfie segmenter and recomposite over a new
@@ -46,6 +65,7 @@ object VisionTools {
     ): Bitmap? {
         var seg: ImageSegmenter? = null
         try {
+            lastError = null
             val opts = ImageSegmenter.ImageSegmenterOptions.builder()
                 .setBaseOptions(BaseOptions.builder().setModelAssetPath(SEG_MODEL).build())
                 .setRunningMode(RunningMode.IMAGE)
@@ -57,8 +77,9 @@ object VisionTools {
             val src = source.copy(Bitmap.Config.ARGB_8888, false)
             val w = src.width; val h = src.height
             val result = seg.segment(BitmapImageBuilder(src).build())
-            val masks = result.confidenceMasks().orElse(null) ?: return null
-            if (masks.isEmpty()) return null
+            val masks = result.confidenceMasks().orElse(null)
+                ?: return fail("removeBackground", "segmenter returned no confidence masks")
+            if (masks.isEmpty()) return fail("removeBackground", "segmenter mask list empty")
             val maskImg = masks[0]
             val buf = ByteBufferExtractor.extract(maskImg).order(ByteOrder.LITTLE_ENDIAN)
             val floats = buf.asFloatBuffer()
@@ -81,8 +102,8 @@ object VisionTools {
                 }
             }
             return Bitmap.createBitmap(out, w, h, Bitmap.Config.ARGB_8888)
-        } catch (_: Throwable) {
-            return null
+        } catch (t: Throwable) {
+            return fail("removeBackground", t)
         } finally {
             seg?.close()
         }
@@ -95,6 +116,7 @@ object VisionTools {
     fun autoCropToFace(context: Context, source: Bitmap): Bitmap? {
         var det: FaceDetector? = null
         try {
+            lastError = null
             val opts = FaceDetector.FaceDetectorOptions.builder()
                 .setBaseOptions(BaseOptions.builder().setModelAssetPath(FACE_MODEL).build())
                 .setRunningMode(RunningMode.IMAGE)
@@ -105,7 +127,7 @@ object VisionTools {
             val src = source.copy(Bitmap.Config.ARGB_8888, false)
             val res = det.detect(BitmapImageBuilder(src).build())
             val faces = res.detections()
-            if (faces.isEmpty()) return null
+            if (faces.isEmpty()) return fail("autoCropToFace", "no face detected in this photo")
             val box: RectF = faces.maxByOrNull { it.boundingBox().width() * it.boundingBox().height() }!!
                 .boundingBox()
 
@@ -126,10 +148,10 @@ object VisionTools {
                 (left + cropW).roundToInt().coerceAtMost(w),
                 (top + cropH).roundToInt().coerceAtMost(h)
             )
-            if (r.width() <= 0 || r.height() <= 0) return null
+            if (r.width() <= 0 || r.height() <= 0) return fail("autoCropToFace", "empty crop rect")
             return Bitmap.createBitmap(src, r.left, r.top, r.width(), r.height())
-        } catch (_: Throwable) {
-            return null
+        } catch (t: Throwable) {
+            return fail("autoCropToFace", t)
         } finally {
             det?.close()
         }

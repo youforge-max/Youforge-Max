@@ -13,6 +13,14 @@
 -dontwarn com.google.auto.value.**
 -keep class com.google.protobuf.** { *; }
 -dontwarn com.google.protobuf.**
+# Flogger: MediaPipe's Graph.<clinit> calls FluentLogger.forEnclosingClass(),
+# which locates its caller by matching Flogger's own class name against the live
+# stack. Renaming it makes that lookup fail with
+# "IllegalStateException: no caller found on the stack", which surfaces as an
+# ExceptionInInitializerError from every MediaPipe task. Names must survive.
+-keep class com.google.common.flogger.** { *; }
+-keepnames class com.google.common.flogger.**
+-dontwarn com.google.common.flogger.**
 # AutoValue's shaded annotation-processor classes leak onto the runtime classpath
 # but are compile-time only (javax.lang.model.* exists in the JDK, not on Android).
 -dontwarn autovalue.shaded.**
