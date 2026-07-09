@@ -1,15 +1,13 @@
 # Changelog
 
 All notable changes to Youforge-Max. Release APKs are `arm64-v8a`, R8-minified,
-and signed.
+and signed. Each heading is a git tag; the APK attached to that tag's GitHub
+Release carries the `versionCode` shown.
 
-From **v1.5.1** onward, each release bumps `versionCode` and sets `versionName` to
-the release tag, so heading, tag, and APK agree. Before that they did not:
-`versionCode` sat at **31** and `versionName` at `1.1-max-p19` across the five
-tags `v1.1-max-p19` … `v1.5-max-p23`, which left those builds indistinguishable to
-Android. The older `r15`/`r16`/`r17` headings below are development milestones and
-their stated `versionCode` values never reached the APK — read them as history,
-not as installable versions.
+From **v1.5.1** onward, every release bumps `versionCode` and sets `versionName`
+to the tag, so heading, tag, and APK agree. Earlier tags did not: `versionCode`
+stayed at **31** and `versionName` at `1.1-max-p19` for all of `v1.1-max-p19`
+through `v1.5-max-p23`, leaving those five builds indistinguishable to Android.
 
 ## v1.5.1 (versionCode 32) — photo tools fixed in release builds
 
@@ -28,21 +26,45 @@ not as installable versions.
   return null, leaving the UI to guess. It records `lastError`, logs under the
   `VisionTools` tag, and the status line shows the actual reason — "no face
   detected in this photo" is now distinguishable from a genuine failure.
+- **Editor:** migrated `EditedMediaItemSequence` to the Builder API.
+- **Deps:** Media3 1.8.1 → **1.10.1** (common, effect, ui); Gradle wrapper 9.6.1.
+- **Versioning:** `versionCode` bumped for the first time since `v1.1-max-p19`.
 - Verified with an instrumented probe run against a minified release build on an
   x86_64 emulator, then confirmed on hardware.
 
-## r17 (versionCode 17) — Kotlin 2.4 toolchain
+## v1.5-max-p23 (versionCode 31) — preview playback
 
-- **Build:** migrated to **Kotlin 2.4.0** and the `org.jetbrains.kotlin.plugin.compose`
+- Fixed editor preview playback: effects pipeline and control tap handling.
+
+## v1.4-max-p22 (versionCode 31) — dark/cyan editor design
+
+- Implemented the dark/cyan design.
+- Fixed the blank preview by switching to a `TextureView`.
+
+## v1.3-max-p21 (versionCode 31) — YouCut-style editor layout
+
+- Preview stage + timeline + tool bar.
+
+## v1.2-max-p20 (versionCode 31) — editor redesign
+
+- Full-bleed preview and a tabbed bottom sheet.
+
+## v1.1-max-p19 (versionCode 31) — first tagged release
+
+Rolls up the work previously tracked as the untagged `r15`–`r17` milestones,
+whose stated `versionCode` values (15/16/17) never reached an APK.
+
+**Toolchain** (was r17)
+
+- Migrated to **Kotlin 2.4.0** and the `org.jetbrains.kotlin.plugin.compose`
   Compose compiler plugin (replaces the pinned `kotlinCompilerExtensionVersion`).
   `kotlinOptions` → the Kotlin 2.x `compilerOptions` DSL.
-- **Compose:** Material 3 / Compose BOM bumped to **2026.06.00**.
-- **Deps:** resolves the held Dependabot updates (compose-bom, kotlin) that could
-  only land together with the toolchain migration; pinned `tasks-vision` to the
-  0.10.x line (ignored the mis-ranked date-scheme version).
-- No behavioural change to either tool — toolchain/dependency release.
+- Material 3 / Compose BOM bumped to **2026.06.00**.
+- Resolves the held Dependabot updates (compose-bom, kotlin) that could only land
+  together with the toolchain migration; pinned `tasks-vision` to the 0.10.x line
+  (ignored the mis-ranked date-scheme version).
 
-## r16 (versionCode 16) — GGUF / llama.cpp backend
+**GGUF / llama.cpp backend** (was r16)
 
 - **New on-device engine:** `.gguf` models via a bundled **llama.cpp** native (NDK)
   backend, alongside the existing MediaPipe `.task` engine. Adds two suggested GGUF
@@ -53,7 +75,7 @@ not as installable versions.
 - **Keep-warm** model cache: only the first suggestion per session pays the load cost.
 - Model picker auto-detects format (`.task` vs `.gguf`) from magic bytes on import.
 
-## r15 (versionCode 15) — security hardening
+**Security hardening** (was r15)
 
 - **HTTPS-only:** `usesCleartextTraffic=false` + a network security config.
 - **Model integrity:** SHA-256 verification of every model download; Zip-Slip guard
@@ -70,7 +92,7 @@ not as installable versions.
   vision included (`tasks-vision` does ship an x86_64 native library — earlier
   editions of this file claimed otherwise).
 - **Primary test device:** **Samsung Galaxy Tab S7+** (Snapdragon 865+, 8 GB) —
-  full feature set confirmed through r16.
+  full feature set confirmed.
 - **RAM guidance:** < 4 GB → template generator only; 4–6 GB → Qwen2.5-0.5B;
   6–8 GB → Qwen2.5-1.5B (default) / TinyLlama; 8 GB+ → any, incl. custom models.
 - **LLM speed** scales with the SoC; the offline template path is always instant.
