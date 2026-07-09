@@ -1,9 +1,17 @@
 # Changelog
 
-All notable changes to Youforge-Max. Versions map to `versionName` / `versionCode`
-in `app/build.gradle.kts`. Release APKs are `arm64-v8a`, R8-minified, and signed.
+All notable changes to Youforge-Max. Release APKs are `arm64-v8a`, R8-minified,
+and signed.
 
-## v1.5.1 — photo tools fixed in release builds
+From **v1.5.1** onward, each release bumps `versionCode` and sets `versionName` to
+the release tag, so heading, tag, and APK agree. Before that they did not:
+`versionCode` sat at **31** and `versionName` at `1.1-max-p19` across the five
+tags `v1.1-max-p19` … `v1.5-max-p23`, which left those builds indistinguishable to
+Android. The older `r15`/`r16`/`r17` headings below are development milestones and
+their stated `versionCode` values never reached the APK — read them as history,
+not as installable versions.
+
+## v1.5.1 (versionCode 32) — photo tools fixed in release builds
 
 - **Fixed:** background cut-out (dark/blur) and auto-frame face failed in *every*
   release build, reporting "couldn't process" for any photo. R8 renamed

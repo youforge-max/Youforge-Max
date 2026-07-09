@@ -12,8 +12,12 @@ android {
         applicationId = "eu.youforgemax"
         minSdk = 29              // MediaPipe GenAI runs on 24+; SAF + Compose fine on 29
         targetSdk = 35
-        versionCode = 31
-        versionName = "1.1-max-p19"
+        // Bump both on every release; versionCode must increase monotonically or
+        // Android treats the build as a reinstall rather than an update. It sat at
+        // 31 from v1.1-max-p19 through v1.5-max-p23, so five releases were
+        // indistinguishable to the package manager. versionName matches the tag.
+        versionCode = 32
+        versionName = "1.5.1"
 
         // Tablet is arm64; drop the other ABIs' native libs to slim the APK.
         ndk { abiFilters += "arm64-v8a" }
