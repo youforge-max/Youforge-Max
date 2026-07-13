@@ -2,6 +2,11 @@
 
 > YouForge Max — on-device Android video editor (import/trim/merge/export via Media3 Transformer).
 
+<p align="center">
+  <img src="docs/screenshot-home.png" alt="YouForge Max — offline creator toolkit" width="260">
+  <img src="docs/screenshot-editor.png" alt="YouForge Max — video editor with timeline, trim and export" width="260">
+</p>
+
 **An offline, private, on-device creator toolkit for Android.**
 
 Youforge-Max is a single app with two tools behind a home screen:
